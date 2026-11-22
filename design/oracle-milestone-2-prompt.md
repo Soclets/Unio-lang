@@ -1,7 +1,6 @@
 # Prompt for Ralph's second milestone: lists, loops and floats
 
-**Not handed over yet:** Tankun starts it when he chooses, and not on 2026-11-22, when building is locked
-(IMPLEMENTATION.md, Building).
+**Not handed over yet:** Tankun starts it when he chooses.
 
 Copy the block below and paste it into a new Claude Code session opened in this repository's folder, with Worktree
 off. A fresh session is meant: Ralph's first session built milestone 1, and everything it learnt is in
