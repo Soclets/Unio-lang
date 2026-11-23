@@ -91,7 +91,8 @@ python3 -c 'import sys; m=open(sys.argv[1]).read().strip(); print("log:", "has c
 Before committing a decision, run `python3 -I design/check-quotes.py TRANSCRIPT.jsonl`, with this session's transcript
 from `~/.claude/projects/`. It passes only when every quote in the newest entry's "Tankun's words", and every quote
 right after "Tankun:" elsewhere in it, is one of Tankun's messages whole and exact, or the design session's own
-question right after "asked" (owner, 2026-11-21).
+question right after "asked", and every *has code* or *too long* marker stands for a message that really has a code
+block or runs over 300 characters (owner, 2026-11-21 and 2026-11-23).
 
 ## Code
 

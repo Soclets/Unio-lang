@@ -3,11 +3,14 @@
 
 Every quote must be one of Tankun's messages, whole and exact, or, after "asked", a stretch of one of the design
 session's own messages. Elsewhere in the entry, a quote right after "Tankun:" must be one of his whole messages.
-Line breaks and runs of spaces count as one space, since DECISIONS.md wraps its lines.
+Line breaks and runs of spaces count as one space, since DECISIONS.md wraps its lines. A "has code" or "too long"
+marker may stand only for a message with a code block or over 300 characters, among Tankun's messages since the
+previous decision's answer.
 
     python3 -I design/check-quotes.py TRANSCRIPT.jsonl [DECISION_NUMBER] [--log OTHER/DECISIONS.md]
 
-With no number, it checks the newest decision. `--log` checks another project's decision log, such as Seal's. It exits with status 0 when every quote matches, 1 otherwise.
+With no number, it checks the newest decision. `--log` checks another project's decision log, such as Seal's. It
+exits with status 0 when every quote matches, 1 otherwise.
 """
 
 import json
@@ -21,7 +24,7 @@ def squash(text):
 
 
 def read_transcript(path):
-    owner, design = [], []
+    owner, design, raw, events = [], [], [], []
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         row = json.loads(line)
         content = row.get("message", {}).get("content")
@@ -29,9 +32,13 @@ def read_transcript(path):
             # Tankun's own messages are plain strings; tool results, notices and summaries aren't, or start with a tag.
             if not content.startswith("<") and not content.startswith("This session is being continued"):
                 owner.append(squash(content))
+                raw.append(content.strip())
+                events.append(("owner", content.strip()))
         elif row.get("type") == "assistant" and isinstance(content, list):
-            design.extend(squash(part["text"]) for part in content if part.get("type") == "text")
-    return owner, design
+            texts = [squash(part["text"]) for part in content if part.get("type") == "text"]
+            design.extend(texts)
+            events.extend(("design", text) for text in texts)
+    return owner, design, raw, events
 
 
 def words_of(decisions, number):
@@ -43,7 +50,28 @@ def words_of(decisions, number):
     start = section.find("**Tankun's words.**")
     if start < 0:
         sys.exit(f"{section.split(chr(10))[0]}: no Tankun's words")
-    return section.split("\n")[0], squash(section[:start]), squash(section[start + len("**Tankun's words.**"):])
+    index = sections.index(section)
+    before = sections[index - 1] if index > 1 else ""
+    earlier = before[before.find("**Tankun's words.**") :] if "**Tankun's words.**" in before else ""
+    return (
+        section.split("\n")[0],
+        squash(section[:start]),
+        squash(section[start + len("**Tankun's words.**") :]),
+        squash(earlier),
+    )
+
+
+def answer_at(words, events):
+    """Where in the conversation the owner answered this entry's question: the first of Tankun's messages after the
+    design session last asked it. None when the entry asks nothing."""
+    asked = re.findall(r'asked "(.*?)", the owner chose', words)
+    if not asked:
+        return None
+    question = asked[-1]
+    asking = [i for i, (who, text) in enumerate(events) if who == "design" and question in text]
+    if not asking:
+        return None
+    return next((i for i in range(asking[-1] + 1, len(events)) if events[i][0] == "owner"), None)
 
 
 def main():
@@ -57,10 +85,10 @@ def main():
         del args[at : at + 2]
     if len(args) not in (1, 2):
         sys.exit(__doc__)
-    owner, design = read_transcript(args[0])
+    owner, design, raw, events = read_transcript(args[0])
     number = int(args[1]) if len(args) == 2 else None
     decisions = log.read_text(encoding="utf-8")
-    title, body, words = words_of(decisions, number)
+    title, body, words, earlier = words_of(decisions, number)
 
     # Take out Tankun's whole messages first, longest first, so a quote holding quote marks of its own still matches.
     rest = words
@@ -85,6 +113,21 @@ def main():
     for found in re.finditer(r'Tankun: "', body):
         if not any(body.startswith(f'"{message}"', found.end() - 1) for message in owner):
             problems.append(body[found.end() : found.end() + 60] + "…")
+
+    # A marker may stand only for a message that can't be quoted: one with a code block, or over 300 characters. Count
+    # the markers against such messages since the previous decision's last quote, up to this decision's last quote.
+    markers = len(re.findall(r"\b(?:has code|too long)\b", rest))
+    end = answer_at(words, events)
+    if markers and end is not None:
+        start = answer_at(earlier, events)
+        start = start + 1 if start is not None and start < end else 0
+        window = [text for who, text in events[start : end + 1] if who == "owner"]
+        unquotable = sum(1 for message in window if "```" in message or len(message) > 300)
+        if markers > unquotable:
+            problems.append(
+                f"{markers} has code or too long marker(s), but only {unquotable} message(s) since the previous "
+                "decision have a code block or run over 300 characters: quote the others whole"
+            )
 
     print(title)
     if problems:
