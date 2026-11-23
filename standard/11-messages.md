@@ -64,11 +64,11 @@ beyond plain English letters.
 | 0 | the program ran to its end, or `ask` found no more input (D96) |
 | 1 | it was refused at compile time, even if `NotBuiltYet` or `NotDesignedYet` messages came too (D148) |
 | 2 | the file couldn't be read |
-| 3 | `NotBuiltYet` or `NotDesignedYet` with no refusals: the program is fine as far as the tool can tell, but `Unlo\n` or Ralph can't handle part of it yet |
+| 3 | `NotBuiltYet` or `NotDesignedYet` with no refusals: the program is fine as far as the tool can tell, but `Beta++` or Ralph can't handle part of it yet |
 | 4 | a check failed at runtime, the program ran out of memory, or its calls went too deep (D115, D154) |
 | 5 | a failure left `proc.main`, or `?? crash` stopped the program on purpose |
 | 6 | the command itself was written wrong, like a missing mode or an unknown command, with every mistake shown, one line each (D82, D116) |
-| 7 | code below the program's Unio went wrong: `Unlo\n`, its runtime or Ralph itself, with a message naming it and saying how to report it, or an `extern.cpp` procedure's C++ code (D82, D103, D131) |
+| 7 | code below the program's Unio went wrong: `Beta++`, its runtime or Ralph itself, with a message naming it and saying how to report it, or an `extern.cpp` procedure's C++ code (D82, D103, D131) |
 
 `NotBuiltYet` is for something decided but not built, and `NotDesignedYet` for something no decision covers. They use
 the same layout, with their name as the kind (D56). A `NotBuiltYet`'s `what:` names the decisions that decided what

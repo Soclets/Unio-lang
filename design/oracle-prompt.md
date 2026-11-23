@@ -1,5 +1,7 @@
 # Prompt for Ralph's first milestone (Ralph is the oracle)
 
+(Since D191 the compiler is called `Beta++`; this prompt was pasted under its old name, `Unlo\n`, and is kept as it was.)
+
 Copy the block below and paste it into a new Claude Code session opened in this repository's folder. Written by the
 design session on 2026-11-21, after reading Anthropic's prompting guides (the general best practices and the page for
 Claude Opus 5.5) in full, as IMPLEMENTATION.md's Prompting rule asks.

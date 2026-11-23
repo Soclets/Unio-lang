@@ -4365,6 +4365,8 @@ as CyborgPL's `KAYO\n` and Cyborg's `OKAY\n` swap letters (Cyborg's D222).
 **Why this won.** It keeps the family's `\n` joke, now as a near-lookalike of the language's own name, with no clash
 with any real tool, and learners only ever type `unio`.
 
+(Changed by D191: the compiler is `Beta++`.)
+
 **Tankun's words.** "yea. What about the compiler? `Unlo\n`?" (in D136's answer), then, asked "Should the compiler be
 `Unlo\n`, typed `unio`?", the owner chose: "yea".
 
@@ -5822,3 +5824,24 @@ Seal's and Cyborg's do. C++ has `not_eq` as a real spelling of `!=`, and Perl co
 **Tankun's words.** "Honestly? I kinda want `eq` for `==` in Unio, and `->` & `!` for `proc`", "That's why `eq` for
 `==`, and then it would `not_eq`", "What about the arrow?", then, asked "Should Unio take all three, `-> Type`, `! [ …
 ]`, and `eq` and `not_eq`, in place of `returns`, `fails`, `==` and `!=`?", the owner chose: "yes".
+
+## D191. Unio's compiler is called `Beta++`
+
+2026-11-23.
+
+**Chosen.** Unio's compiler, written in C++ on LLVM (D131), is called `Beta++`, replacing D137's `Unlo\n`. It pairs with the
+oracle's name: Ralph is from "Rocq Alpha", the first implementation, in Rocq; `Beta++` is the second, in C++. A third,
+someday, would be Gamma. People still type `unio` to run it (D136, D137).
+
+**Weighed.**
+- `Unlo\n`, Unio with its `i` swapped for an `l`, in the family of Cyborg's `OKAY\n` and CyborgPL's `KAYO\n`.
+- `Un1o\n`, `Oinu\n` and `Unus\n`, the design claude's suggestions: more `\n` look-alikes and anagrams.
+- "Beta" also means unfinished software, and BETA is a dormant 1980s language from Norway; neither matters much for
+  an in-joke that tells the implementations' story.
+
+**Why this won.** The two names tell the order and the language of each implementation, the proven one first and the
+fast one second, which suits Unio, whose implementations are built as a pair.
+
+**Tankun's words.** "Any new compiler names?", "I meant Unio's", "`Beta++`?
+Impl in C++, and is the second impl.", "What is c letter full name? Cockimus?", "Gamma means three? Shit, why is it not
+cm", then, asked "Should Unio's compiler be renamed from `Unlo\n` to `Beta++`?", the owner chose: "Yea".

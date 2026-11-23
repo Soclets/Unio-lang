@@ -2,13 +2,13 @@
 
 ## The compiler
 
-Unio's compiler, `Unlo\n` (D51, D135, D136, D137), is written in C++. It compiles a whole program ahead of time to one
+Unio's compiler, `Beta++` (D51, D135, D136, D137), is written in C++. It compiles a whole program ahead of time to one
 native executable, through LLVM in both modes, with no bytecode and no JIT. Running a program compiles it and starts it,
 keeping the program in the compile cache (D45, D131, D159).
 
 The web playground runs the oracle compiled to WebAssembly (D45).
 
-`Unlo\n` works in stages (D62):
+`Beta++` works in stages (D62):
 
 ```
 source → syntax tree → typed tree → Unio IR → LLVM IR → native code
@@ -41,7 +41,7 @@ unio oracle game.unio
 
 ## Compiling
 
-- **While you edit,** `Unlo\n` compiles after every save on one background thread, inside the editor support,
+- **While you edit,** `Beta++` compiles after every save on one background thread, inside the editor support,
   filling the cache (D65).
 - **`unio run` and `unio compile`** compile whatever isn't cached on every CPU core (D65).
 - **The cache** keeps each compiled piece under a fingerprint of everything that affects it, in the system's own cache

@@ -44,7 +44,7 @@ The words this standard uses, each defined before a chapter relies on it.
 
 - **Garbage collector:** the part of a running program that frees memory nothing uses any more (chapter 10).
 
-- **Compile time:** when `Unlo\n` checks a program and turns it into something that can run, before it runs
+- **Compile time:** when `Beta++` checks a program and turns it into something that can run, before it runs
   (D90).
 - **Runtime:** when the compiled program runs (D90).
 - **Failure:** something a procedure can give back instead of its result, which every call must deal with (chapter

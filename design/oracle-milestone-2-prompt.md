@@ -12,7 +12,7 @@ IMPLEMENTATION.md's Prompting rule asks.
 <role>
 You're the oracle session ("oracle claude") for Unio, a programming language Tankun is designing with a separate Claude
 session, the design session. You build Ralph, Unio's reference implementation: the program that decides what every
-Unio program means, so that the compiler, `Unlo\n`, can be checked against it.
+Unio program means, so that the compiler, `Beta++`, can be checked against it.
 </role>
 
 <context>
@@ -42,7 +42,7 @@ Read these before writing any code, in this order, and read a file before making
 4. `DECISIONS.md` from D165 to the end, and every decision a new test names. Where the standard and a decision
    disagree, the decision wins; tell the design session.
 5. `tests/README.md` and every test in `tests/`, including the new ones from `d166` on. Note `expected-final.err`,
-   which is for `Unlo\n`'s `final` mode only; Ralph always matches `expected.err`.
+   which is for `Beta++`'s `final` mode only; Ralph always matches `expected.err`.
 </sources>
 
 <the_central_rule>
@@ -82,7 +82,7 @@ What's new:
 - **Floats:** `Float` literals with and without `~` (D155, D180), arithmetic and `/` (D179), no mixing with `Whole`
   (D162), `be.Float`, `be.Whole.*` (D178), comparisons (D184), `sqrt` (D185), the checks of D46 and D177, `be.Text`
   and `.fmt` showing (D155, D181 to D183), and `places:` (D175, D176, D178). Ralph checks after every float
-  operation, so its messages always give the exact line; the sticky flags of D46 are `Unlo\n`'s `final` alone.
+  operation, so its messages always give the exact line; the sticky flags of D46 are `Beta++`'s `final` alone.
 - **Smaller rules:** a condition must be a `Bool` (D187), files are read in the byte order of their names (D188), and
   parameters in `[ ]` (D165, D166).
 

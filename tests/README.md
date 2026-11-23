@@ -1,6 +1,6 @@
 # Unio's tests
 
-The contract `Unlo\n` and Ralph are built to pass (D12). Each test is written by hand from the standard,
+The contract `Beta++` and Ralph are built to pass (D12). Each test is written by hand from the standard,
 and names the decisions it checks.
 
 ## A test
@@ -27,7 +27,7 @@ unio run program.unio --working < input.txt
 
 from inside the test's own folder, so a message names the file as `program.unio` (with no input when there's no
 `input.txt`), its standard output, standard error and exit status match the expected
-files exactly. `Unlo\n`'s own messages go to standard error. The same test run with `--final` matches the same files, except that
+files exactly. `Beta++`'s own messages go to standard error. The same test run with `--final` matches the same files, except that
 standard error matches `expected-final.err` where the test has one. Only D46's float check can need one: in `final` it
 names the procedure or loop, where `working` names the exact line. Everything else is the same in both modes. Once Ralph exists, every test runs on
 `unio oracle` too, with the same expected files (D50).
