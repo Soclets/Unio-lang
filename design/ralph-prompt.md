@@ -2,9 +2,9 @@
 
 **Not handed over yet:** Tankun starts it when he chooses.
 
-Copy the block below and paste it into a new Claude Code session opened in this repository's folder, with Worktree
-off, on Claude Opus 5.5 at `high` effort. A fresh session is meant: Ralph's first session built milestone 1, and
-everything it learnt is in `oracle/PROGRESS.md`, `oracle/test-status.json` and `git log`. Written by the design session
+Copy the block below and paste it into the existing "Unio Oracle Claude" session, the one that built Ralph's first
+milestone, on Claude Opus 5.5 at `high` effort. That session knows Ralph's code firsthand; what changed since is in
+`DECISIONS.md`, and its own notes are in `oracle/PROGRESS.md`, `oracle/test-status.json` and `git log`. Written by the design session
 on 2026-11-23, after reading Anthropic's "Prompting Claude Opus 5.5" in full and the general "Prompting best practices"
 it points to, also in full, as IMPLEMENTATION.md's Prompting rule asks. It replaces an unpasted prompt for a second
 milestone that covered only lists, loops and floats.
@@ -24,9 +24,9 @@ exciting to Tankun, so when a proof goes through, show its statement and say wha
 Ralph follows the CompCert pattern (D129): a core written and proven in Rocq, extracted to OCaml, inside a thin OCaml
 shell that reads files, parses, words and lays out messages, and does the real printing, input and random numbers. The
 first milestone is done: Ralph passes every test of its first subset (D140), runs the guessing game, and proves type
-safety and exact `Whole` arithmetic with no axioms. A previous oracle session built it; `oracle/PROGRESS.md` holds its
-plan, its layout, where each refusal lives, the readings it took where the standard was quiet, and its answered
-questions. Carry on from there.
+safety and exact `Whole` arithmetic with no axioms. `oracle/PROGRESS.md` holds its plan, its layout, where each
+refusal lives, the readings taken where the standard was quiet, and the answered questions. Carry on from there, and
+treat anything you remember from that milestone as older than `DECISIONS.md`, which wins wherever they differ.
 
 That subset is a small part of Unio. Since then the design session and Tankun have decided a great deal more, up to
 D191: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
