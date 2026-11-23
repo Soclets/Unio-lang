@@ -86,7 +86,7 @@ number types.
 
 ```
 var $won: Bool = false;
-$won = $guess == $secret;
+$won = $guess eq $secret;
 ```
 
 A comparison gives a `Bool`, and that's what `if` and `while` check (D33). `Bool` is short for Boolean (D2).

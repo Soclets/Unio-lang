@@ -51,7 +51,7 @@ Spacing is fixed, and anything else is refused with the corrected line as the fi
 
 | Where | Rule | Right |
 |---|---|---|
-| around `=`, `==`, `!=`, `<`, `>`, `+`, `-`, `*`, `/`, `&`, `\|>`, `??` and word operators | one space each side | `a == b` |
+| around `=`, `<`, `>`, `+`, `-`, `*`, `/`, `&`, `\|>`, `??`, `->`, `!` and word operators like `eq` | one space each side | `a eq b` |
 | a narrowing's `.` | none | `show_msg.same_line` |
 | a negating `-` | none after it | `-speed` |
 | after `,` and `:` | one space | `add(1, 2)` |
@@ -75,7 +75,7 @@ them all (D100).
 
 ```
 /// Gives the larger of two whole numbers.
-proc larger[$a: Whole, $b: Whole] returns Whole:
+proc larger[$a: Whole, $b: Whole] -> Whole:
     // the tie goes to $b
     ...
 end proc larger

@@ -1,9 +1,9 @@
-proc heal[$health: Whole, $amount: Whole, $times: Whole] returns Whole:
+proc heal[$health: Whole, $amount: Whole, $times: Whole] -> Whole:
     labels $amount as by, $times as times;
     return $health + $amount * $times;
 end proc heal
 
-proc larger[$a: Whole, $b: Whole] returns Whole:
+proc larger[$a: Whole, $b: Whole] -> Whole:
     if $a > $b:
         return $a;
     else:

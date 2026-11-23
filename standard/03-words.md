@@ -27,7 +27,7 @@ message".
 | `labels`, `as` | | D25 |
 | `.fmt` | format | D2, D29 |
 | `extern`, `.cpp` | external | D2, D36, D131 |
-| `returns` | | D37 |
+| `eq`, `not_eq` | equal, not equal | D190 |
 | `return` | | D57 |
 | `fam` | family | D2, D41 |
 | `div`, `.floor`, `.trunc` | divide, truncate | D2, D70 |
@@ -36,7 +36,6 @@ message".
 | `handler` | | D42 |
 | `include` | | D43 |
 | `comment` | | D74 |
-| `fails`, `or` | | D39 |
 
 **Not decided:** every other keyword.
 
@@ -74,7 +73,7 @@ because it's how school maths writes it (D165).
 ## Symbols
 
 A symbol has one job in any one place: `-` between two values subtracts and right before one negates, and `*` between
-two values multiplies and right after a dot marks a handler. A longer symbol, like `!=` or `|>`, is a symbol of its
+two values multiplies and right after a dot marks a handler. A longer symbol, like `->` or `|>`, is a symbol of its
 own (D60).
 
 | Symbol | Meaning | Decided in |
@@ -85,7 +84,9 @@ own (D60).
 | `=` | gives a variable its first value, or a `var` a new one | D13, D14 |
 | `.` | after a word, names a kind (narrows); after a value, calls a method; touching both sides | D4, D6, D18, D41, D77 |
 | `::` | names a package, when two packages share a name | D64 |
-| `==`, `!=`, `<`, `>` | compare, with a space on each side of `<` and `>` | D17 |
+| `<`, `>` | compare, with a space on each side | D17 |
+| `->` | comes before the type a procedure gives back | D37, D190 |
+| `!` | comes before the failures a procedure can give, in `[ ]` | D39, D190 |
 | `\|>` | passes a value along a slide | D5 |
 | `+`, `-` | add and subtract, with a space on each side; a `-` with no space after it negates | D27 |
 | `*` | multiplies, with a space on each side | D59 |

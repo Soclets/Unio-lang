@@ -1,13 +1,13 @@
-proc is_even[$n: Whole] returns Bool:
-    if $n == 0:
+proc is_even[$n: Whole] -> Bool:
+    if $n eq 0:
         return true;
     else:
         return is_odd($n - 1);
     end if
 end proc is_even
 
-proc is_odd[$n: Whole] returns Bool:
-    if $n == 0:
+proc is_odd[$n: Whole] -> Bool:
+    if $n eq 0:
         return false;
     else:
         return is_even($n - 1);

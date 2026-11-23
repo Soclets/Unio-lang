@@ -28,24 +28,24 @@ end if
 ## Comparisons
 
 ```
-$lives == 0
-$guess != $secret
+$lives eq 0
+$guess not_eq $secret
 $guess < $secret
 $score > $best
 $hp at_least 1
 $hp at_most 100
 ```
 
-- **`==` and `!=`:** equal and not equal (D17).
+- **`eq` and `not_eq`:** equal and not equal (D17, D190).
 - **`<` and `>`:** less and greater, with a space on each side, so they're never mistaken for a type's `< >`, which has
   none (D3, D17).
 - **`at_least` and `at_most`:** instead of `>=` and `<=` (D17).
 - **A lone `=` in a condition is refused** (D14).
-- **On two `Float`s, every comparison is exact,** comparing the stored values: `~0.1 + ~0.2 == ~0.3` is `false`,
+- **On two `Float`s, every comparison is exact,** comparing the stored values: `~0.1 + ~0.2 eq ~0.3` is `false`,
   since the two are neighbouring `Float`s (D184).
 
 **A condition must be a `Bool`** (D187). A number or text doesn't stand for true or false: `if $lives:` is refused,
-with `if $lives != 0:` as the fix.
+with `if $lives not_eq 0:` as the fix.
 
 **Not decided:** comparing two pieces of text.
 
@@ -59,10 +59,10 @@ if not $won:
     show_msg.fmt("Out of tries! It was {$secret}.");
 end if
 
-if $hp at_least 1 and $lives > 0 or $cheat == true:
+if $hp at_least 1 and $lives > 0 or $cheat eq true:
 ```
 
-The second means `(hp at_least 1 and lives > 0) or cheat == true`.
+The second means `(hp at_least 1 and lives > 0) or cheat eq true`.
 
 `and` and `or` stop early: the right side runs only if it can still change the answer (D34).
 
@@ -86,13 +86,13 @@ while $tries < 5:
 end while
 ```
 
-**`==` and `!=` between two `Float`s are refused in a `while` condition** (D184). A `Float` that changes each pass
+**`eq` and `not_eq` between two `Float`s are refused in a `while` condition** (D184, D190). A `Float` that changes each pass
 rarely lands exactly on a value, so the loop could skip past it and never stop; `<`, `>`, `at_least` or `at_most` say
 "until it reaches", and the refusal's fix gives one:
 
 ```
 var $timer: Float = 0.0;
-while $timer < 1.0:          // `while $timer != 1.0:` is refused
+while $timer < 1.0:          // `while $timer not_eq 1.0:` is refused
     $timer = $timer + ~0.1;
 end while
 ```
@@ -192,7 +192,7 @@ block, and code that should run afterwards goes in the ways that don't leave (D9
 Each is refused at compile time (D9).
 
 ```
-proc larger[$a: Whole, $b: Whole] returns Whole:
+proc larger[$a: Whole, $b: Whole] -> Whole:
     if $a > $b:
         return $a;
     else:

@@ -1,4 +1,4 @@
-proc one[$n: Whole] returns Whole:
+proc one[$n: Whole] -> Whole:
     if $n < 2:
         return 2;
     else:

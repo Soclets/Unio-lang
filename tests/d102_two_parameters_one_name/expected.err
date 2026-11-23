@@ -1,5 +1,5 @@
 refused: program.unio:1:21, line 1 column 21
- 1 | proc add[$x: Whole, $x: Whole] returns Whole:
+ 1 | proc add[$x: Whole, $x: Whole] -> Whole:
    |                     ^^
  what:    two parameters are named `$x`
  why:     each parameter needs its own name.

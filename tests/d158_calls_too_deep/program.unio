@@ -1,4 +1,4 @@
-proc count[$n: Whole] returns Whole:
+proc count[$n: Whole] -> Whole:
     return count($n + 1);
 end proc count
 

@@ -1,4 +1,4 @@
-proc sum_to[$n: Whole] returns Whole:
+proc sum_to[$n: Whole] -> Whole:
     if $n < 1:
         return 0;
     else:

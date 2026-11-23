@@ -3,29 +3,29 @@
 ## Definitions
 
 ```
-proc name[parameters] returns Type:
+proc name[parameters] -> Type:
     body
 end proc name
 ```
 
 where `name` is the procedure's name, `parameters` its parameters separated by commas, `Type` the type it gives back,
-and `body` its statements. `proc`, `returns`, the brackets, the `:` and `end proc` are written as they are (D3, D8).
+and `body` its statements. `proc`, `->`, the brackets, the `:` and `end proc` are written as they are (D3, D8, D190).
 
 A definition writes its parameters in `[ ]` (D165), and only when it has some; written in `( )`, they're refused,
 with the `[ ]` form as the fix (D166). One that takes nothing has no brackets
 (D4):
 
 ```
-proc roll_dice returns Whole:
+proc roll_dice -> Whole:
     ...
 end proc roll_dice
 ```
 
 where `...` stands for the procedure's body.
 
-A procedure that gives back a value says so at the end of its header, with `returns` and the type (D37).
+A procedure that gives back a value says so at the end of its header, with `->` and the type (D37, D190).
 
-A procedure that gives nothing back writes no `returns` (D38):
+A procedure that gives nothing back writes no `->` (D38, D190):
 
 ```
 proc greet[$name: Text]:
@@ -35,10 +35,10 @@ Using what such a procedure gives as a value is refused (D38).
 
 ### `return`
 
-- **`return value;`** gives back a value of the header's type, and every way through a procedure with `returns` must
+- **`return value;`** gives back a value of the header's type, and every way through a procedure with `->` must
   end in one (D57). Every `while` counts as able to end, whatever its condition, so a procedure that loops with
   `while true:` still needs a `return` after the loop (D149).
-- **A bare `return;`** leaves early, in a procedure with no `returns` (D57).
+- **A bare `return;`** leaves early, in a procedure with no `->` (D57).
 - **Nothing may follow `return` in the same block** (D57).
 - **A bare `return;` as a procedure's last line is refused** (D57).
 
@@ -49,9 +49,9 @@ a type (D125, D126). Writing a shared type once in front, as in `proc add[Whole 
 parameter is read-only, like a `let` (D147).
 
 ```
-proc add[$a: Whole, $b: Whole] returns Whole:
+proc add[$a: Whole, $b: Whole] -> Whole:
 proc draw[$x: Whole, $name: Text]:
-proc double[$n: Whole] returns Whole:
+proc double[$n: Whole] -> Whole:
 ```
 
 Failures in a header: chapter 8.
@@ -62,7 +62,7 @@ Failures in a header: chapter 8.
 empty, or holds only a `labels` line, and its closer doesn't repeat `extern.cpp` (D36, D131):
 
 ```
-extern.cpp proc beep returns Bool:
+extern.cpp proc beep -> Bool:
 end proc beep
 ```
 
@@ -143,7 +143,7 @@ where each `parameter` is one of the procedure's parameters and `label` the word
 the commas and the `;` are written as they are.
 
 ```
-proc random[$low: Whole, $high: Whole] returns Whole:
+proc random[$low: Whole, $high: Whole] -> Whole:
     labels $low as from, $high as to;
     ...
 end proc random

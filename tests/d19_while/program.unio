@@ -6,7 +6,7 @@ proc.main:
     end while
     var $m: Whole = 10;
     while true:
-        if $m == 12:
+        if $m eq 12:
             break;
         else:
             $m = $m + 1;

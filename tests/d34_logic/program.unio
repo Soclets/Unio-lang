@@ -1,4 +1,4 @@
-proc noisy[$value: Bool] returns Bool:
+proc noisy[$value: Bool] -> Bool:
     show_msg("ran");
     return $value;
 end proc noisy

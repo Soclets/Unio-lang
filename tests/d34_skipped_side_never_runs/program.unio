@@ -1,4 +1,4 @@
-proc forever[$n: Whole] returns Bool:
+proc forever[$n: Whole] -> Bool:
     return forever($n);
 end proc forever
 

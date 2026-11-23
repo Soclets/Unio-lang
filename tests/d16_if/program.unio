@@ -16,7 +16,7 @@ proc.main:
     else:
         show_msg("not at most 41");
     end if
-    if $guess != $secret:
+    if $guess not_eq $secret:
         show_msg("different");
     end if
 end proc.main

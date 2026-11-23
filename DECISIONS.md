@@ -455,6 +455,8 @@ $tries = $tries + 1;
 so the two can't be confused. It's how Python and most languages write a change, and searching for `$tries =` still
 finds every one. Keeping `=` out of conditions catches the `=`-for-`==` typo.
 
+(Changed by D190: the fix and the `why:` name `eq`, not `==`.)
+
 **Tankun's words.** Asked "A bare `=` changes a `var`, and `change` goes?", the owner chose: "yea".
 
 ## D15. `Whole` is a 64-bit signed whole number, with no other name
@@ -544,6 +546,8 @@ $hp at_most 100
 **Why this won.** Symbols where they're read at a glance, words where they aren't: `==`, `!=`, `<` and `>` are
 understood without reading them in your head, and `at_least` and `at_most` say exactly whether the number counts. The
 spacing rule keeps comparisons and types apart. This is Plainly v1's D33 and D34.
+
+(Changed by D190: `==` and `!=` are `eq` and `not_eq`.)
 
 **Tankun's words.** Asked "Those six comparisons?", the owner chose: "yea, `proc . main` also shouldn't be legal"
 (the second half is D18).
@@ -1112,6 +1116,8 @@ in the header aren't decided yet.)
 **Why this won.** It reads as what it says, "returns a whole number", in the header where a reader looks for what a
 procedure takes and gives. It's Plainly v1's word.
 
+(Changed by D190: the result is written `-> Type`.)
+
 **Tankun's words.** In answer to D36's question: "yea. `returns` locked".
 
 ## D38. A procedure that gives nothing back writes no `returns`
@@ -1167,6 +1173,8 @@ A failure's name is a plain word, like `not_found` or `disk_full`.
 **Why this won.** The header reads as English, "returns a Level, or fails: not found, broken", and the failures sit
 next to what the procedure gives back, since a failure is what it can give back instead. The brackets follow the same
 reasoning as D25's `labels` line.
+
+(Changed by D190: failures are written `! [ … ]`.)
 
 **Tankun's words.** Asked "`fails`, then names separated by commas, no brackets?", the owner chose: "yea".
 
@@ -5775,3 +5783,42 @@ and OCaml. MetaRocq has proven Rocq's logic sound, given its consistency, which 
 **Tankun's words.** "install", "Was the tester proved?", "That is so unresponsible, ugh", "Ah, they aren't proven,
 right?", "Is Rocq proven by SPARK Platinum and Rocq?", then, asked "Should Ralph accept these four standard axioms, listed in its axioms
 file, for proving floats?", the owner chose: "yea".
+
+## D190. `eq` and `not_eq` compare, `-> Type` gives a procedure's result, and `! [ … ]` its failures
+
+2026-11-23.
+
+**Chosen.**
+- **`eq` and `not_eq` replace `==` and `!=`:** `if $guess eq $secret:`. `<` and `>` stay, as school maths writes them,
+  beside D17's `at_least` and `at_most`.
+- **`-> Type` replaces `returns`:** `proc double[$n: Whole] -> Whole:`. A procedure that gives nothing back writes no
+  `->`.
+- **`! [ … ]` replaces `fails`,** its failures in `[ ]`, after `-> Type` when there is one:
+  `proc load_level[$name: Text] -> Level ! [not_found, broken]:`.
+- **So `!` has one job, failures** (D60), now that nothing uses it for "not".
+
+```
+proc load_level[$name: Text] -> Level ! [not_found, broken]:
+proc save_game[$state: Text] ! [disk_full]:
+if $guess not_eq $secret:
+```
+
+D14's refusal of `=` in a condition now gives `eq` as its fix and says "`eq` compares". This matches Seal's D45, and
+Cyborg's `->`. Ralph and `Unlo\n` build the old spellings, so the tests changing under them need telling; Seal's
+comparisons, which came from Unio (Seal D22), are a separate question.
+
+**Weighed.**
+- `returns` and `fails`, as words, as Unio had them: they read aloud and explain themselves, which matters most in the
+  beginner language. But `->` is familiar, and `!` stops being a trap once `!=` is gone.
+- `-> Type` with `fails` kept as a word, as the design claude first recommended, because `!` beside `!=` would mean
+  two things. Tankun's `eq` and `not_eq` remove `!=`, which removes the reason.
+- `==` and `!=` kept: `=` against `==` is the classic beginner mistake, which needed D14's special refusal; with `eq`
+  there's no `==` to confuse with `=`.
+
+**Why this won.** The comparisons finish what D17 started with `at_least` and `at_most`, turning programming symbols
+into words while keeping school maths' `<` and `>`, and that frees `!` for one job, so Unio's procedures can read as
+Seal's and Cyborg's do. C++ has `not_eq` as a real spelling of `!=`, and Perl compares text with `eq`.
+
+**Tankun's words.** "Honestly? I kinda want `eq` for `==` in Unio, and `->` & `!` for `proc`", "That's why `eq` for
+`==`, and then it would `not_eq`", "What about the arrow?", then, asked "Should Unio take all three, `-> Type`, `! [ …
+]`, and `eq` and `not_eq`, in place of `returns`, `fails`, `==` and `!=`?", the owner chose: "yes".

@@ -1,4 +1,4 @@
-proc add($a: Whole, $b: Whole) returns Whole:
+proc add($a: Whole, $b: Whole) -> Whole:
     return $a + $b;
 end proc add
 

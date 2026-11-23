@@ -1,8 +1,8 @@
-proc double[$n: Whole] returns Whole:
+proc double[$n: Whole] -> Whole:
     return $n * 2;
 end proc double
 
-proc add_to[$n: Whole, $amount: Whole] returns Whole:
+proc add_to[$n: Whole, $amount: Whole] -> Whole:
     labels $amount as by;
     return $n + $amount;
 end proc add_to

@@ -12,12 +12,12 @@ On its own, that line is refused, since `be.Whole` can fail and nothing handles 
 
 ## Listing failures
 
-A procedure that can fail lists its failures at the end of its header, after `fails`, separated by commas. After
-`returns`, it's joined with `or`; with no `returns`, `fails` stands alone (D38, D39):
+A procedure that can fail lists its failures at the end of its header, after `!`, in `[ ]` separated by commas, and
+after `-> Type` when it gives back a value (D38, D39, D190):
 
 ```
-proc load_level[$name: Text] returns Level or fails not_found, broken:
-proc save_game[$state: Text] fails disk_full:
+proc load_level[$name: Text] -> Level ! [not_found, broken]:
+proc save_game[$state: Text] ! [disk_full]:
 ```
 
 A failure's name is a plain word, like `not_found` (D39).
