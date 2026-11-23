@@ -5,9 +5,9 @@ Every quote must be one of Tankun's messages, whole and exact, or, after "asked"
 session's own messages. Elsewhere in the entry, a quote right after "Tankun:" must be one of his whole messages.
 Line breaks and runs of spaces count as one space, since DECISIONS.md wraps its lines.
 
-    python3 -I design/check-quotes.py TRANSCRIPT.jsonl [DECISION_NUMBER]
+    python3 -I design/check-quotes.py TRANSCRIPT.jsonl [DECISION_NUMBER] [--log OTHER/DECISIONS.md]
 
-With no number, it checks the newest decision. It exits with status 0 when every quote matches, 1 otherwise.
+With no number, it checks the newest decision. `--log` checks another project's decision log, such as Seal's. It exits with status 0 when every quote matches, 1 otherwise.
 """
 
 import json
@@ -47,11 +47,19 @@ def words_of(decisions, number):
 
 
 def main():
-    if len(sys.argv) not in (2, 3):
+    args = sys.argv[1:]
+    log = Path(__file__).resolve().parent.parent / "DECISIONS.md"
+    if "--log" in args:
+        at = args.index("--log")
+        if at + 1 >= len(args):
+            sys.exit(__doc__)
+        log = Path(args[at + 1])
+        del args[at : at + 2]
+    if len(args) not in (1, 2):
         sys.exit(__doc__)
-    owner, design = read_transcript(sys.argv[1])
-    number = int(sys.argv[2]) if len(sys.argv) == 3 else None
-    decisions = (Path(__file__).resolve().parent.parent / "DECISIONS.md").read_text(encoding="utf-8")
+    owner, design = read_transcript(args[0])
+    number = int(args[1]) if len(args) == 2 else None
+    decisions = log.read_text(encoding="utf-8")
     title, body, words = words_of(decisions, number)
 
     # Take out Tankun's whole messages first, longest first, so a quote holding quote marks of its own still matches.
