@@ -66,8 +66,15 @@ def main():
     rest = words
     for message in sorted(set(owner), key=len, reverse=True):
         rest = rest.replace(f'"{message}"', " ")
-    # Whatever is still quoted must be the design session's question, right after "asked".
     problems = []
+    # The design session's question runs from `asked "` to `", the owner chose`, so it may hold quote marks itself.
+    def question(found):
+        if not any(found.group(1) in text for text in design):
+            problems.append(found.group(1))
+        return " "
+
+    rest = re.sub(r'asked "(.*?)", the owner chose', question, rest)
+    # Whatever is still quoted must be the design session's question, right after "asked".
     for found in re.finditer(r'"([^"]*)"', rest):
         quote = found.group(1)
         asked = rest[: found.start()].rstrip().lower().endswith("asked")
