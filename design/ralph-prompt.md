@@ -33,10 +33,10 @@ D201: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D15
 D42 to D44, D186), families (D41), comments and spacing (D74, D97, D98), several files in one program (D64, D188),
 `Bool` conditions (D187), and new spellings (D190: `eq` and `not_eq` for `==` and `!=`, `-> Type` for `returns`, and
 `! [ … ]` for `fails`; D192: names have no `$`; D195: `labels [ … ]`; D199: no `:` on opening lines; D200: every text
-fills its braces, with no `.fmt`; D201: no `&`). The compiler is now called `Beta++` (D191). Tests in `tests/` changed with D190,
-D192, D195, D199, D200 and D201, so some your first milestone passed now fail until Ralph reads the new spellings. D196 moves
-`be`, `.same_line` and `.len` from keywords to built-ins, which changes which names are refused; D193, D194, D197 and
-D198 are about colours and the docs' font.
+fills its braces, with no `.fmt`; D201: no `&`). The compiler is now called `Beta++` (D191). Tests in `tests/` changed
+with D190, D192, D195, D199, D200 and D201, so some your first milestone passed now fail until Ralph reads the new
+spellings. D196 moves `be`, `.same_line` and `.len` from keywords to built-ins, which changes which names are refused;
+D193, D194, D197 and D198 are about colours and the docs' font.
 </context>
 
 <sources>
