@@ -4,10 +4,12 @@
    beyond those isn't decided (D54). A token never runs over two lines: text in quotes can't hold a line break (D30). *)
 
 type kind =
-  | Word of string  (** a keyword, a procedure's name, a narrowing or a type *)
-  | Dollar of string  (** a variable's name, after its `$` (D125), as written, good or bad *)
+  | Word of string  (** a keyword, a name, a narrowing or a type *)
+  | Dollar of string
+      (** a name written after a `$`, which names no longer have (D192), so it can be refused *)
   | Number of string  (** a whole number's digits (D15) *)
-  | Text of string  (** text in double quotes, as written between them, with its `\` escapes (D21, D30) *)
+  | Text of string
+      (** text in double quotes, as written between them, with its `\` escapes (D21, D30) *)
   | Unclosed_text of string  (** text whose closing double quote never comes on its line *)
   | Single_quoted of string  (** text in single quotes, which is refused (D21) *)
   | Symbol of string  (** one of Unio's symbols, the longest that fits (D60) *)
@@ -28,10 +30,38 @@ let is_letter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 let is_digit c = c >= '0' && c <= '9'
 let is_word_character c = is_letter c || is_digit c || c = '_'
 
-(* The longest symbol first, so `==` is never read as two `=` (D60). *)
+(* The longest symbol first, so `->` is never read as `-` and `>` (D60). `==`, `!=` and `&` aren't Unio's any more
+   (D190, D201), but are read whole so they can be refused with their fix. *)
 let symbols =
-  [ "|>"; "=="; "!="; "??"; "::"; "//"; "("; ")"; "["; "]"; ","; ":"; ";"; "."; "="; "<"; ">"; "+"; "-"; "*"; "/";
-    "&"; "?"; "{"; "}" ]
+  [
+    "|>";
+    "->";
+    "==";
+    "!=";
+    "??";
+    "::";
+    "//";
+    "(";
+    ")";
+    "[";
+    "]";
+    ",";
+    ":";
+    ";";
+    ".";
+    "=";
+    "<";
+    ">";
+    "+";
+    "-";
+    "*";
+    "/";
+    "&";
+    "!";
+    "?";
+    "{";
+    "}";
+  ]
 
 let starts_with text at prefix =
   let length = String.length prefix in
@@ -43,9 +73,11 @@ let lex_line number text =
   (* Reads text in quotes from [start], the opening quote; gives its token and where it ends. *)
   let read_quoted quote start make =
     let rec scan at =
-      if at >= length then (token (Unclosed_text (String.sub text (start + 1) (at - start - 1))) start at, at)
+      if at >= length then
+        (token (Unclosed_text (String.sub text (start + 1) (at - start - 1))) start at, at)
       else if text.[at] = '\\' && at + 1 < length then scan (at + 2)
-      else if text.[at] = quote then (token (make (String.sub text (start + 1) (at - start - 1))) start (at + 1), at + 1)
+      else if text.[at] = quote then
+        (token (make (String.sub text (start + 1) (at - start - 1))) start (at + 1), at + 1)
       else scan (at + 1)
     in
     scan (start + 1)
@@ -83,7 +115,9 @@ let lex_line number text =
         | None ->
             (* One whole UTF-8 character, so a message never cuts one in half. *)
             let code = Char.code c in
-            let size = if code >= 0xF0 then 4 else if code >= 0xE0 then 3 else if code >= 0xC0 then 2 else 1 in
+            let size =
+              if code >= 0xF0 then 4 else if code >= 0xE0 then 3 else if code >= 0xC0 then 2 else 1
+            in
             let finish = min length (at + size) in
             scan finish (token (Unknown (String.sub text at (finish - at))) at finish :: tokens)
   in
@@ -98,13 +132,12 @@ let lines_of contents =
   let pieces =
     List.mapi
       (fun i piece ->
-        if i < last && String.ends_with ~suffix:"\r" piece then String.sub piece 0 (String.length piece - 1)
+        if i < last && String.ends_with ~suffix:"\r" piece then
+          String.sub piece 0 (String.length piece - 1)
         else piece)
       pieces
   in
-  let pieces =
-    match List.rev pieces with "" :: rest -> List.rev rest | _ -> pieces
-  in
+  let pieces = match List.rev pieces with "" :: rest -> List.rev rest | _ -> pieces in
   List.mapi (fun index text -> lex_line (index + 1) text) pieces
 
 let describe kind =

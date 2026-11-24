@@ -1,8 +1,9 @@
 (* The parser: reads a Unio file's tokens into the core's syntax tree (core/Syntax.v).
 
-   It refuses what's about how a program is written: `;` and `:` (D7, D8), closers (D8), indentation (D10), text in
-   single quotes (D21), `=` in a condition (D14), chains of comparisons (D81), names (D99), and blank lines (D97). What a
-   program means is the core's to judge (core/Checker.v).
+   It refuses what's about how a program is written: `;` (D7), opening lines (D199), closers (D8), indentation (D10),
+   text in single quotes (D21), `=` in a condition (D14), chains of comparisons (D81), names (D99, D192), the old
+   spellings D190 and D201 replaced, and blank lines (D97). What a program means is the core's to judge
+   (core/Checker.v).
 
    After a mistake it carries on with the next statement (D55), and a part it couldn't read becomes [Broken], which the
    checker passes over silently. When an opening line is too broken to tell what was meant, checking stops there
@@ -11,10 +12,45 @@
 open Lexer
 module M = Messages
 
+(* trace: D196. Unio's grammar words, chapter 3's table; `be`, `.same_line` and `.len` are built-ins, not keywords. *)
 let keywords =
-  [ "proc"; "end"; "let"; "var"; "if"; "else"; "at_least"; "at_most"; "while"; "break"; "true"; "false"; "and";
-    "or"; "not"; "be"; "ignore"; "crash"; "otherwise"; "case"; "instead"; "labels"; "as"; "extern"; "returns";
-    "return"; "fam"; "div"; "rem"; "handler"; "include"; "comment"; "fails" ]
+  [
+    "proc";
+    "end";
+    "let";
+    "var";
+    "if";
+    "else";
+    "at_least";
+    "at_most";
+    "while";
+    "break";
+    "for";
+    "each";
+    "in";
+    "true";
+    "false";
+    "and";
+    "or";
+    "not";
+    "ignore";
+    "crash";
+    "otherwise";
+    "case";
+    "instead";
+    "labels";
+    "as";
+    "extern";
+    "eq";
+    "not_eq";
+    "return";
+    "fam";
+    "div";
+    "rem";
+    "handler";
+    "include";
+    "comment";
+  ]
 
 let is_keyword word = List.mem word keywords
 
@@ -40,8 +76,10 @@ let line_text st number =
 
 let report st m = st.problems <- m :: st.problems
 let peek st = if st.index < Array.length st.tokens then Some st.tokens.(st.index) else None
+
 let peek_ahead st k =
   if st.index + k < Array.length st.tokens then Some st.tokens.(st.index + k) else None
+
 let previous st = if st.index > 0 then Some st.tokens.(st.index - 1) else None
 
 (* Takes the next token, noting a statement that runs onto another line: how its later lines are indented isn't
@@ -61,6 +99,7 @@ let advance st =
 let is_symbol s t = match t.kind with Symbol s' -> s = s' | _ -> false
 let is_word w t = match t.kind with Word w' -> w = w' | _ -> false
 let next_is st test = match peek st with Some t -> test t | None -> false
+let next_is_after st k test = match peek_ahead st k with Some t -> test t | None -> false
 
 type span = { line : int; first : int; stop : int }
 
@@ -74,14 +113,18 @@ let join st a b =
 let current_file = ref 0
 
 let place_of s =
-  { Core.place_file = !current_file; place_line = s.line; place_column = s.first; place_width = s.stop - s.first }
+  {
+    Core.place_file = !current_file;
+    place_line = s.line;
+    place_column = s.first;
+    place_width = s.stop - s.first;
+  }
+
 let place_of_token t = place_of (span_of t)
 
 (* The end of the last token taken, where a missing `;` or `:` goes. *)
 let after_previous st =
-  match previous st with
-  | Some t -> (t.line, t.column + t.width)
-  | None -> (1, 1)
+  match previous st with Some t -> (t.line, t.column + t.width) | None -> (1, 1)
 
 (* trace: D92. The parser's own three messages, with no `why:`. *)
 let expected st what =
@@ -92,19 +135,27 @@ let expected st what =
            ~what:(Printf.sprintf "%s should be here, not `%s`" what (describe t.kind)))
   | Some _ ->
       let line, column = after_previous st in
-      report st (M.message M.Refused (M.point line column 1) ~what:(Printf.sprintf "the line ends where %s should be" what))
+      report st
+        (M.message M.Refused (M.point line column 1)
+           ~what:(Printf.sprintf "the line ends where %s should be" what))
   | None ->
       let line, column = after_previous st in
-      report st (M.message M.Refused (M.point line column 1) ~what:(Printf.sprintf "the file ends where %s should be" what))
+      report st
+        (M.message M.Refused (M.point line column 1)
+           ~what:(Printf.sprintf "the file ends where %s should be" what))
 
 let not_built st (t : token) what =
-  report st (M.message M.Not_built_yet (M.point t.line t.column t.width) ~what:(what ^ " aren't built yet"))
+  report st
+    (M.message M.Not_built_yet (M.point t.line t.column t.width) ~what:(what ^ " aren't built yet"))
 
 let not_built_is st (t : token) what =
-  report st (M.message M.Not_built_yet (M.point t.line t.column t.width) ~what:(what ^ " isn't built yet"))
+  report st
+    (M.message M.Not_built_yet (M.point t.line t.column t.width) ~what:(what ^ " isn't built yet"))
 
 let not_designed st (t : token) what =
-  report st (M.message M.Not_designed_yet (M.point t.line t.column t.width) ~what:(what ^ " isn't decided yet"))
+  report st
+    (M.message M.Not_designed_yet (M.point t.line t.column t.width)
+       ~what:(what ^ " isn't decided yet"))
 
 (* Skips the rest of a statement that couldn't be read: up to its `;`, or the end of its line. *)
 let skip_statement st =
@@ -128,7 +179,9 @@ let check_name st (t : token) written name =
     report st
       (M.message M.Refused (M.point t.line t.column t.width)
          ~what:(Printf.sprintf "`%s` has a capital letter, but names have none" written)
-         ~why:"a name is lowercase letters and digits, starting with a letter, with `_` only between words.")
+         ~why:
+           "a name is lowercase letters and digits, starting with a letter, with `_` only between \
+            words.")
   else
     (* trace: D142 *)
     let problem =
@@ -136,7 +189,9 @@ let check_name st (t : token) written name =
       else if name.[0] = '_' then Some "starts with `_`, but names start with a letter"
       else if name.[length - 1] = '_' then Some "ends with `_`, but `_` only goes between words"
       else
-        let rec doubled i = i + 1 < length && ((name.[i] = '_' && name.[i + 1] = '_') || doubled (i + 1)) in
+        let rec doubled i =
+          i + 1 < length && ((name.[i] = '_' && name.[i + 1] = '_') || doubled (i + 1))
+        in
         if doubled 0 then Some "has two `_` in a row, but `_` only goes between words" else None
     in
     match problem with
@@ -144,7 +199,9 @@ let check_name st (t : token) written name =
         report st
           (M.message M.Refused (M.point t.line t.column t.width)
              ~what:(Printf.sprintf "`%s` %s" written problem)
-             ~why:"a name is lowercase letters and digits, starting with a letter, with `_` only between words.")
+             ~why:
+               "a name is lowercase letters and digits, starting with a letter, with `_` only \
+                between words.")
     | None -> ()
 
 (* ---------------------------------------------------------------------------------------------------------------- *)
@@ -169,10 +226,16 @@ let plain_value raw =
 
 let all_word_characters s = String.length s > 0 && String.for_all is_word_character s
 
-(* trace: D29, D30, D133. Text's pieces, as `.fmt` reads it; [column] is where the text's first character is. *)
+(* trace: D29, D30, D175, D200. Text's pieces: every text fills in its braces; [column] is where the text's first
+   character is. Braces hold a name, or a name with `places:` (D175), as in `{speed, places: 2}`. *)
 let pieces_of raw line column =
   let place_at i width =
-    { Core.place_file = !current_file; place_line = line; place_column = column + i; place_width = width }
+    {
+      Core.place_file = !current_file;
+      place_line = line;
+      place_column = column + i;
+      place_width = width;
+    }
   in
   let buffer = Buffer.create (String.length raw) in
   let flush pieces =
@@ -183,6 +246,7 @@ let pieces_of raw line column =
       Core.Piece_text text :: pieces
     end
   in
+  let is_name s = all_word_characters s && is_letter s.[0] in
   let rec go i pieces =
     if i >= String.length raw then List.rev (flush pieces)
     else if raw.[i] = '\\' && i + 1 < String.length raw then begin
@@ -195,12 +259,22 @@ let pieces_of raw line column =
       | Some j ->
           let inside = String.sub raw (i + 1) (j - i - 1) in
           let piece =
-            if inside = "" then Core.Piece_other (place_at i 2)
-            else if inside.[0] = '$' && all_word_characters (String.sub inside 1 (String.length inside - 1)) then
-              Core.Piece_variable (String.sub inside 1 (String.length inside - 1), place_at (i + 1) (j - i - 1))
-            else if all_word_characters inside && is_letter inside.[0] then
-              Core.Piece_bare_name (inside, place_at (i + 1) (j - i - 1))
-            else Core.Piece_other (place_at (i + 1) (j - i - 1))
+            if is_name inside then Core.Piece_name (inside, place_at (i + 1) (j - i - 1))
+            else
+              match String.index_opt inside ',' with
+              | Some k
+                when is_name (String.sub inside 0 k)
+                     && String.starts_with ~prefix:", places: "
+                          (String.sub inside k (String.length inside - k))
+                     && String.length inside > k + 10
+                     && String.for_all is_digit
+                          (String.sub inside (k + 10) (String.length inside - k - 10)) ->
+                  Core.Piece_places
+                    ( String.sub inside 0 k,
+                      place_at (i + 1) k,
+                      String.sub inside (k + 10) (String.length inside - k - 10),
+                      place_at (i + 1 + k + 2) (String.length inside - k - 2) )
+              | _ -> Core.Piece_other (place_at (i + 1) (max 1 (j - i - 1)))
           in
           go (j + 1) (piece :: flush pieces)
     else begin
@@ -213,10 +287,11 @@ let pieces_of raw line column =
 (* ---------------------------------------------------------------------------------------------------------------- *)
 (* Expressions *)
 
+(* trace: D17, D190 *)
 let comparison_operator t =
   match t.kind with
-  | Symbol "==" -> Some Core.Equal
-  | Symbol "!=" -> Some Core.Not_equal
+  | Word "eq" -> Some Core.Equal
+  | Word "not_eq" -> Some Core.Not_equal
   | Symbol "<" -> Some Core.Less
   | Symbol ">" -> Some Core.Greater
   | Word "at_least" -> Some Core.At_least
@@ -225,7 +300,7 @@ let comparison_operator t =
 
 let source_of st s = String.sub (line_text st s.line) (s.first - 1) (s.stop - s.first)
 
-(* A callee: a word and its narrowings (D18), as in `show_msg.fmt.same_line`. *)
+(* A callee: a word and its narrowings (D18), as in `show_msg.same_line`. *)
 let parse_callee st (word : token) name =
   advance st;
   let rec narrowings acc last =
@@ -237,7 +312,8 @@ let parse_callee st (word : token) name =
     | _ -> (List.rev acc, last)
   in
   let narrowings, last = narrowings [] (span_of word) in
-  ({ Core.callee_word = name; callee_word_at = place_of_token word; callee_narrowings = narrowings }, join st (span_of word) last)
+  ( { Core.callee_word = name; callee_word_at = place_of_token word; callee_narrowings = narrowings },
+    join st (span_of word) last )
 
 let rec parse_expression st : (Core.expression * span) parsed = parse_slide st
 
@@ -250,10 +326,10 @@ and parse_slide st =
       | Some t when is_symbol "|>" t -> (
           advance st;
           match peek st with
-          | Some ({ kind = Word name; _ } as word) when not (is_keyword name && name <> "be") ->
+          | Some ({ kind = Word name; _ } as word) when not (is_keyword name) -> (
               let callee, callee_span = parse_callee st word name in
               let* step =
-                if next_is st (is_symbol "(") then
+                if next_is st (is_symbol "(") then (
                   let* given, close = parse_arguments st in
                   (match given with
                   | Core.No_arguments ->
@@ -263,15 +339,19 @@ and parse_slide st =
                            ~fix:
                              (M.replace_at (line_text st callee_span.line) callee_span.stop
                                 (close.stop - callee_span.stop) "")
-                           ~why:"a step with nothing else to pass is written bare, since the slide gives it its value.")
+                           ~why:
+                             "a step with nothing else to pass is written bare, since the slide \
+                              gives it its value.")
                   | _ -> ());
-                  Ok (callee, true, given, join st callee_span close)
+                  Ok (callee, true, given, join st callee_span close))
                 else Ok (callee, false, Core.No_arguments, callee_span)
               in
               let _, _, _, step_span = step in
-              (match peek st with
+              match peek st with
               | Some t when Option.is_some (binary_operator t) || is_symbol "??" t ->
-                  not_built_is st t "refusing an operator after a slide's step, with brackets as the fix (D81, D128),";
+                  not_built_is st t
+                    "refusing an operator after a slide's step, with brackets as the fix (D81, \
+                     D128),";
                   Error ()
               | _ -> steps (step :: acc) step_span)
           | _ ->
@@ -280,7 +360,8 @@ and parse_slide st =
       | _ ->
           let path =
             List.fold_left
-              (fun rest (callee, bracketed, given, s) -> Core.Step (callee, bracketed, given, place_of s, rest))
+              (fun rest (callee, bracketed, given, s) ->
+                Core.Step (callee, bracketed, given, place_of s, rest))
               Core.No_steps acc
           in
           let whole = join st start_span last in
@@ -294,7 +375,6 @@ and binary_operator t =
   | Symbol "+" -> Some Core.Add
   | Symbol "-" -> Some Core.Subtract
   | Symbol "*" -> Some Core.Multiply
-  | Symbol "&" -> Some Core.Join
   | Word "and" -> Some Core.And
   | Word "or" -> Some Core.Or
   | _ -> comparison_operator t
@@ -346,24 +426,51 @@ and parse_comparison st =
               if a_span.line = c_span.line then begin
                 let text = line_text st a_span.line in
                 let middle = source_of st b_span in
-                let first_comparison = String.sub text (a_span.first - 1) (b_span.stop - a_span.first) in
-                let second_comparison = middle ^ String.sub text (b_span.stop - 1) (c_span.stop - b_span.stop) in
+                let first_comparison =
+                  String.sub text (a_span.first - 1) (b_span.stop - a_span.first)
+                in
+                let second_comparison =
+                  middle ^ String.sub text (b_span.stop - 1) (c_span.stop - b_span.stop)
+                in
                 report st
-                  (M.message M.Refused (M.point t2.line t2.column t2.width)
+                  (M.message M.Refused
+                     (M.point t2.line t2.column t2.width)
                      ~fix:
                        (M.replace_at text a_span.first (c_span.stop - a_span.first)
                           (first_comparison ^ " and " ^ second_comparison))
                      ~why:
-                       "a comparison sets two values against each other; `and` joins two comparisons, naming the \
-                        middle value twice.")
+                       "a comparison sets two values against each other; `and` joins two \
+                        comparisons, naming the middle value twice.")
               end;
               Error ()
           | _ -> Ok (Core.Binary (operator, a, b, place_of_token t, place_of whole), whole)))
   | None -> Ok (a, a_span)
 
-(* trace: D27, D28, D72. `+`, `-` and `&` read left to right; `&` beside maths is the checker's to refuse. *)
+(* trace: D27, D201. `+` and `-` read left to right. `&` isn't Unio's any more: text is joined by filling it in. *)
 and parse_additive st =
-  left_to_right st [ (Symbol "+", Core.Add); (Symbol "-", Core.Subtract); (Symbol "&", Core.Join) ] parse_multiplicative
+  let* first, first_span =
+    left_to_right st [ (Symbol "+", Core.Add); (Symbol "-", Core.Subtract) ] parse_multiplicative
+  in
+  match peek st with
+  | Some t when is_symbol "&" t ->
+      advance st;
+      report st
+        (M.message M.Refused (M.point t.line t.column 1) ~what:"`&` isn't how Unio joins text"
+           ~why:"text is joined by filling it in with braces, as in `\"{first} {last}\"`.");
+      let rec rest last =
+        match parse_multiplicative st with
+        | Ok (_, s) -> (
+            match peek st with
+            | Some u when is_symbol "&" u || is_symbol "+" u || is_symbol "-" u ->
+                advance st;
+                rest s
+            | _ -> Ok s)
+        | Error () -> Ok last
+      in
+      let* last = rest first_span in
+      let whole = join st first_span last in
+      Ok (Core.Broken (place_of whole), whole)
+  | _ -> Ok (first, first_span)
 
 and parse_multiplicative st =
   let* first, first_span = parse_unary st in
@@ -417,7 +524,7 @@ and parse_postfix st =
       not_built_is st t "passing a failure up with `?` (D23)";
       Error ()
   | Some t when is_symbol "." t ->
-      not_built st t "methods and facts after a value, as in `$list.len` (D77, D79),";
+      not_built st t "methods and facts after a value, as in `list.len` (D77, D79),";
       Error ()
   | _ -> Ok (value, value_span)
 
@@ -433,7 +540,7 @@ and parse_primary st =
           Ok (Core.Whole_literal (digits, place_of_token t), span_of t)
       | Text raw ->
           advance st;
-          Ok (Core.Text_literal (plain_value raw, pieces_of raw t.line (t.column + 1), place_of_token t), span_of t)
+          Ok (Core.Text_literal (pieces_of raw t.line (t.column + 1), place_of_token t), span_of t)
       | Single_quoted raw ->
           advance st;
           report st
@@ -444,31 +551,29 @@ and parse_primary st =
       | Unclosed_text _ ->
           advance st;
           let line, column = (t.line, t.column + t.width) in
-          report st (M.message M.Refused (M.point line column 1) ~what:"the line ends where `\"` should be");
+          report st
+            (M.message M.Refused (M.point line column 1) ~what:"the line ends where `\"` should be");
           Error ()
-      | Dollar name ->
-          advance st;
-          if next_is st (is_symbol "(") then begin
-            report st
-              (M.message M.Refused (M.point t.line t.column t.width)
-                 ~what:(Printf.sprintf "`$%s` is a variable, not a procedure" name)
-                 ~why:"only a procedure can be called.");
-            Error ()
-          end
-          else Ok (Core.Variable_value (name, place_of_token t), span_of t)
       | Word "true" ->
           advance st;
           Ok (Core.Bool_literal (true, place_of_token t), span_of t)
       | Word "false" ->
           advance st;
           Ok (Core.Bool_literal (false, place_of_token t), span_of t)
-      | Word name when (not (is_keyword name)) || name = "be" ->
+      | Word name when not (is_keyword name) -> (
           let callee, callee_span = parse_callee st t name in
           if next_is st (is_symbol "(") then
             let* given, close = parse_arguments st in
             let whole = join st callee_span close in
             Ok (Core.Call (callee, given, place_of whole), whole)
-          else Ok (Core.Bare_word (name, place_of callee_span), callee_span)
+          else if callee.callee_narrowings = [] then
+            Ok (Core.Variable_value (name, place_of_token t), span_of t)
+          else
+            match List.rev callee.callee_narrowings with
+            | ("len", _) :: _ ->
+                not_built st t "methods and facts after a value, as in `list.len` (D77, D79),";
+                Error ()
+            | _ -> Ok (Core.Bare_word (name, place_of callee_span), callee_span))
       | Symbol "(" ->
           advance st;
           let* inner, _ = parse_expression st in
@@ -507,7 +612,8 @@ and parse_arguments st =
     let rec loop acc =
       let label =
         match (peek st, peek_ahead st 1) with
-        | Some ({ kind = Word w; _ } as t), Some colon when is_symbol ":" colon && not (is_keyword w) ->
+        | Some ({ kind = Word w; _ } as t), Some colon
+          when is_symbol ":" colon && not (is_keyword w) ->
             advance st;
             advance st;
             Some (w, place_of_token t)
@@ -521,8 +627,9 @@ and parse_arguments st =
       | _ ->
           let* close = expect_closing st ")" in
           let given =
-            List.fold_left (fun rest (label, value) -> Core.Argument (label, value, rest)) Core.No_arguments
-              ((label, value) :: acc)
+            List.fold_left
+              (fun rest (label, value) -> Core.Argument (label, value, rest))
+              Core.No_arguments ((label, value) :: acc)
           in
           Ok (given, close)
     in
@@ -567,7 +674,9 @@ let begin_line st (t : token) depth =
       report st
         (M.message M.Refused
            (M.point t.line 1 (String.length indentation))
-           ~fix:(String.make (4 * depth) ' ' ^ String.sub text (t.column - 1) (String.length text - t.column + 1))
+           ~fix:
+             (String.make (4 * depth) ' '
+             ^ String.sub text (t.column - 1) (String.length text - t.column + 1))
            ~why:"each level of indentation is 4 spaces, and tabs aren't used.")
   end
 
@@ -585,26 +694,26 @@ let expect_semicolon st =
            ~fix:(M.insert_at (line_text st line) column ";")
            ~why:"every statement ends with `;`.")
 
-(* trace: D8, D55. An opening line ends with `:`. Missing only that, it's clear what was meant, and checking carries
-   on into the body; anything else stops checking there. *)
-let expect_opener_colon st =
+(* trace: D55, D199. An opening line ends with nothing. One ending with `:`, as Python writes it, is refused with the
+   line without it as the fix, and checking carries on into the body, since it's clear what was meant; anything else
+   after the opening line stops checking there. *)
+let expect_opener_end st =
   match peek st with
-  | Some t when is_symbol ":" t && t.line = st.statement_line -> (
+  | Some t
+    when is_symbol ":" t && t.line = st.statement_line
+         && not (next_is_after st 1 (fun u -> u.line = t.line)) ->
       advance st;
-      match peek st with
-      | Some u when u.line = t.line ->
-          expected st "the end of the line";
-          st.stopped <- true
-      | _ -> ())
-  | Some t when t.line = st.statement_line ->
-      expected st "`:`";
-      st.stopped <- true
-  | _ ->
-      let line, column = after_previous st in
+      let text = line_text st t.line in
+      let rec spaces_before i = if i > 0 && text.[i - 1] = ' ' then spaces_before (i - 1) else i in
+      let from = spaces_before (t.column - 1) in
       report st
-        (M.message M.Refused (M.point line column 1)
-           ~fix:(M.insert_at (line_text st line) column ":")
-           ~why:"a block's opening line ends with `:`.")
+        (M.message M.Refused (M.point t.line t.column 1)
+           ~fix:(M.replace_at text (from + 1) (t.column - from) "")
+           ~why:"a block's opening line ends with nothing; `end` shows where the block ends.")
+  | Some t when t.line = st.statement_line ->
+      expected st "the end of the line";
+      st.stopped <- true
+  | _ -> ()
 
 (* The words of a closer, as in ["end"; "proc"; "."; "main"]. *)
 let closer_words st =
@@ -639,7 +748,8 @@ let parse_closer st depth wanted =
         | Some semicolon when is_symbol ";" semicolon && semicolon.line = t.line ->
             advance st;
             report st
-              (M.message M.Refused (M.point semicolon.line semicolon.column 1)
+              (M.message M.Refused
+                 (M.point semicolon.line semicolon.column 1)
                  ~fix:(M.replace_at (line_text st t.line) semicolon.column 1 "")
                  ~why:"a closer stands alone, with no `;`.")
         | _ -> ()
@@ -668,19 +778,20 @@ let parse_closer st depth wanted =
         skip ()
       end
 
+(* trace: D13, D15, D21, D33, D161 *)
 let parse_type st : Core.type0 parsed =
   match peek st with
-  | Some ({ kind = Word "Whole"; _ }) ->
+  | Some { kind = Word "Whole"; _ } ->
       advance st;
       Ok Core.Whole
-  | Some ({ kind = Word "Bool"; _ }) ->
+  | Some { kind = Word "Bool"; _ } ->
       advance st;
       Ok Core.Bool
-  | Some ({ kind = Word "Text"; _ }) ->
+  | Some { kind = Word "Text"; _ } ->
       advance st;
       Ok Core.Text
-  | Some ({ kind = Word "List"; _ } as t) ->
-      not_built st t "lists, `List<Type>` and `[ ]` (D75),";
+  | Some ({ kind = Word ("List" | "Array"); _ } as t) ->
+      not_built st t "lists and arrays, `List<Type>`, `Array<Type>` and `[ ]` (D75, D167),";
       Error ()
   | Some ({ kind = Word "Float"; _ } as t) ->
       not_built_is st t "`Float` (D157, D162, D163)";
@@ -698,17 +809,32 @@ let parse_type st : Core.type0 parsed =
 
 let statement_span st (t : token) =
   let last =
-    match previous st with Some p when p.line = t.line -> p.column + p.width | _ -> t.column + t.width
+    match previous st with
+    | Some p when p.line = t.line -> p.column + p.width
+    | _ -> t.column + t.width
   in
   { line = t.line; first = t.column; stop = last }
+
+(* trace: D58, D87, D192. A keyword where a name goes: refused, and read on as if it were a name. *)
+let keyword_as_name st (t : token) name =
+  report st
+    (M.message M.Refused (M.point t.line t.column t.width)
+       ~what:(Printf.sprintf "`%s` is a keyword, so it can't be a name" name)
+       ~why:"a name can't be one of Unio's own words.")
 
 (* trace: D13. `let` or `var`, the name, `:`, the type, `=` and the first value. *)
 let parse_declaration st (keyword : token) changeable : Core.statement parsed =
   advance st;
   match peek st with
-  | Some ({ kind = Dollar name; _ } as name_token) -> (
+  | Some ({ kind = Word name; _ } as name_token)
+    when not
+           (String.length name > 0
+           && name.[0] >= 'A'
+           && name.[0] <= 'Z'
+           && next_is_after st 1 (fun u -> not (is_symbol ":" u))) ->
       advance st;
-      check_name st name_token ("$" ^ name) name;
+      if is_keyword name then keyword_as_name st name_token name
+      else check_name st name_token name name;
       let* written =
         match peek st with
         | Some t when is_symbol ":" t ->
@@ -723,8 +849,9 @@ let parse_declaration st (keyword : token) changeable : Core.statement parsed =
             parse_type st
         | Some t when is_symbol "=" t ->
             report st
-              (M.message M.Refused (M.point name_token.line name_token.column name_token.width)
-                 ~what:(Printf.sprintf "`$%s` needs its type, written after a `:`" name)
+              (M.message M.Refused
+                 (M.point name_token.line name_token.column name_token.width)
+                 ~what:(Printf.sprintf "`%s` needs its type, written after a `:`" name)
                  ~why:"a declaration always writes the variable's type.");
             Error ()
         | _ ->
@@ -758,16 +885,18 @@ let parse_declaration st (keyword : token) changeable : Core.statement parsed =
       (match value with Core.Broken _ -> skip_statement st | _ -> expect_semicolon st);
       Ok
         (Core.Declare
-           ( changeable, name, place_of_token name_token, place_of_token keyword, written, value,
-             place_of (statement_span st keyword) )))
-  | Some ({ kind = Word w; _ } as t) when not (is_keyword w) ->
-      not_designed st t "the message for a variable written without its `$`";
-      Error ()
+           ( changeable,
+             name,
+             place_of_token name_token,
+             place_of_token keyword,
+             written,
+             value,
+             place_of (statement_span st keyword) ))
   | _ ->
       expected st "a variable's name";
       Error ()
 
-(* The condition of `if`, `else if` or `while`: `=` in it is refused, with `==` as the fix (D14). *)
+(* The condition of `if`, `else if` or `while`: `=` in it is refused, with `eq` as the fix (D14, D190). *)
 let parse_condition st : Core.expression =
   match parse_expression st with
   | Ok (condition, _) -> (
@@ -775,8 +904,8 @@ let parse_condition st : Core.expression =
       | Some t when is_symbol "=" t && t.line = st.statement_line ->
           report st
             (M.message M.Refused (M.point t.line t.column 1)
-               ~fix:(M.replace_at (line_text st t.line) t.column 1 "==")
-               ~why:"`=` gives a variable a value, and is never part of a condition; `==` compares.");
+               ~fix:(M.replace_at (line_text st t.line) t.column 1 "eq")
+               ~why:"`=` gives a variable a value, and is never part of a condition; `eq` compares.");
           advance st;
           let _ = parse_expression st in
           Core.Broken (place_of_token t)
@@ -784,13 +913,19 @@ let parse_condition st : Core.expression =
   | Error () ->
       let rec skip () =
         match peek st with
-        | Some t when t.line = st.statement_line && not (is_symbol ":" t) ->
+        | Some t when t.line = st.statement_line ->
             advance st;
             skip ()
         | _ -> ()
       in
       skip ();
-      Core.Broken { Core.place_file = !current_file; place_line = st.statement_line; place_column = 1; place_width = 1 }
+      Core.Broken
+        {
+          Core.place_file = !current_file;
+          place_line = st.statement_line;
+          place_column = 1;
+          place_width = 1;
+        }
 
 let rec parse_block st depth : Core.block =
   let rec statements acc =
@@ -817,7 +952,7 @@ and parse_statement st (t : token) depth : Core.statement parsed =
   | Word "while" ->
       advance st;
       let condition = parse_condition st in
-      expect_opener_colon st;
+      expect_opener_end st;
       let at = place_of (statement_span st t) in
       st.closers <- "end while" :: st.closers;
       let body = parse_block st (depth + 1) in
@@ -843,20 +978,28 @@ and parse_statement st (t : token) depth : Core.statement parsed =
         Ok (Core.Return (Some value, at))
   | Word "labels" -> parse_labels st t
   | Word ("otherwise" | "case" | "instead" | "include") ->
-      not_built_is st t "handling failures with `otherwise:` (D40, D43)";
+      not_built_is st t "handling failures with `otherwise` (D40, D43)";
       Error ()
-  | Word "comment" ->
-      not_built st t "block comments, `comment name:` (D74),";
+  | Word "for" ->
+      not_built_is st t "going through a list with `for each` (D171, D174)";
       st.stopped <- true;
       Error ()
-  | Dollar name when (match peek_ahead st 1 with Some u -> is_symbol "=" u | None -> false) ->
+  | Word "comment" ->
+      not_built st t "block comments, `comment name` (D74),";
+      st.stopped <- true;
+      Error ()
+  | Word name
+    when (not (is_keyword name))
+         && match peek_ahead st 1 with Some u -> is_symbol "=" u | None -> false ->
       advance st;
       let operator = peek st in
       advance st;
       let* value, _ = parse_expression st in
       let at = place_of (statement_span st t) in
       expect_semicolon st;
-      let operator_at = match operator with Some o -> place_of_token o | None -> place_of_token t in
+      let operator_at =
+        match operator with Some o -> place_of_token o | None -> place_of_token t
+      in
       Ok (Core.Assign (name, place_of_token t, value, operator_at, at))
   | _ ->
       let* action, _ = parse_expression st in
@@ -868,7 +1011,7 @@ and parse_statement st (t : token) depth : Core.statement parsed =
 and parse_if st (t : token) depth =
   advance st;
   let condition = parse_condition st in
-  expect_opener_colon st;
+  expect_opener_end st;
   let at = place_of (statement_span st t) in
   st.closers <- "end if" :: st.closers;
   let then_part = parse_block st (depth + 1) in
@@ -883,21 +1026,22 @@ and parse_if st (t : token) depth =
           | Some i when is_word "if" i ->
               advance st;
               let condition = parse_condition st in
-              expect_opener_colon st;
+              expect_opener_end st;
               let at = place_of (statement_span st e) in
               let body = parse_block st (depth + 1) in
               let others = rest () in
               Core.Else_if (condition, body, others, at)
           | _ ->
-              expect_opener_colon st;
+              expect_opener_end st;
               let at = place_of (statement_span st e) in
               let body = parse_block st (depth + 1) in
               (match peek st with
               | Some extra when is_word "else" extra ->
                   report st
-                    (M.message M.Refused (M.point extra.line extra.column extra.width)
-                       ~what:"nothing can follow an `if`'s `else:` part but `end if`"
-                       ~why:"an `if` has at most one `else:`, and it comes last.");
+                    (M.message M.Refused
+                       (M.point extra.line extra.column extra.width)
+                       ~what:"nothing can follow an `if`'s `else` part but `end if`"
+                       ~why:"an `if` has at most one `else`, and it comes last.");
                   st.stopped <- true
               | _ -> ());
               Core.Else (body, at))
@@ -908,19 +1052,27 @@ and parse_if st (t : token) depth =
   if not st.stopped then parse_closer st depth "end if";
   Ok (Core.If (condition, then_part, otherwise, at))
 
-(* trace: D25. `labels $parameter as label, ...;` *)
+(* trace: D25, D195. `labels [parameter as label, ...];`. Without its `[ ]` it's refused, with them as the fix, and
+   read on. *)
 and parse_labels st (t : token) =
   advance st;
+  let bracketed = next_is st (is_symbol "[") in
+  if bracketed then advance st;
   let rec pairs acc =
     match (peek st, peek_ahead st 1, peek_ahead st 2) with
-    | Some ({ kind = Dollar parameter; _ } as p), Some a, Some ({ kind = Word label; _ } as l) when is_word "as" a -> (
+    | Some ({ kind = Word parameter; _ } as p), Some a, Some ({ kind = Word label; _ } as l)
+      when is_word "as" a && not (is_keyword parameter) -> (
         advance st;
         advance st;
         advance st;
         check_name st l label label;
         let pair =
-          { Core.pair_parameter = parameter; pair_parameter_at = place_of_token p; pair_label = label;
-            pair_label_at = place_of_token l }
+          {
+            Core.pair_parameter = parameter;
+            pair_parameter_at = place_of_token p;
+            pair_label = label;
+            pair_label_at = place_of_token l;
+          }
         in
         match peek st with
         | Some c when is_symbol "," c ->
@@ -928,10 +1080,33 @@ and parse_labels st (t : token) =
             pairs (pair :: acc)
         | _ -> Ok (List.rev (pair :: acc)))
     | _ ->
-        expected st "a parameter and its label, as in `$low as from`";
+        expected st "a parameter and its label, as in `low as from`";
         Error ()
   in
   let* found = pairs [] in
+  let* () =
+    if bracketed then (
+      match peek st with
+      | Some c when is_symbol "]" c ->
+          advance st;
+          Ok ()
+      | _ ->
+          expected st "`]`";
+          Error ())
+    else
+      match previous st with
+      | Some last when last.line = t.line ->
+          let text = line_text st t.line in
+          let first = t.column + t.width + 1 in
+          let stop = last.column + last.width in
+          report st
+            (M.message M.Refused
+               (M.point t.line first (stop - first))
+               ~fix:(M.insert_at (M.insert_at text stop "]") first "[")
+               ~why:"a `labels` line puts its pairs in `[ ]`.");
+          Ok ()
+      | _ -> Ok ()
+  in
   let at = place_of (statement_span st t) in
   expect_semicolon st;
   Ok (Core.Labels (found, at))
@@ -948,15 +1123,19 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
            ~fix:(M.replace_at (line_text st open_bracket.line) open_bracket.column 2 "")
            ~why:"a definition writes `[ ]` only when it has parameters.");
       Ok []
-  | Some ({ kind = Word w; _ } as t) when String.length w > 0 && w.[0] >= 'A' && w.[0] <= 'Z' ->
+  | Some ({ kind = Word w; _ } as t)
+    when String.length w > 0
+         && w.[0] >= 'A'
+         && w.[0] <= 'Z'
+         && not (next_is_after st 1 (is_symbol ":")) ->
       not_built_is st t "refusing a type written once in front of several parameters (D126, D132)";
       Error ()
   | _ ->
       let rec loop acc =
         match peek st with
-        | Some ({ kind = Dollar name; _ } as t) -> (
+        | Some ({ kind = Word name; _ } as t) when next_is_after st 1 (is_symbol ":") -> (
             advance st;
-            check_name st t ("$" ^ name) name;
+            if is_keyword name then keyword_as_name st t name else check_name st t name name;
             let* () =
               if next_is st (is_symbol ":") then begin
                 advance st;
@@ -968,7 +1147,13 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
               end
             in
             let* written = parse_type st in
-            let parameter = { Core.parameter_name = name; parameter_at = place_of_token t; parameter_type = written } in
+            let parameter =
+              {
+                Core.parameter_name = name;
+                parameter_at = place_of_token t;
+                parameter_type = written;
+              }
+            in
             match peek st with
             | Some c when is_symbol "," c ->
                 advance st;
@@ -980,12 +1165,13 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
                 expected st "`]`";
                 Error ())
         | _ ->
-            expected st "a parameter, as in `$score: Whole`";
+            expected st "a parameter, as in `score: Whole`";
             Error ()
       in
       loop []
 
-(* trace: D4, D8, D37, D38, D58, D132, D165. `proc name(parameters) returns Type:`, its body, and `end proc name`. *)
+(* trace: D4, D8, D37, D38, D58, D132, D165, D190, D199. `proc name[parameters] -> Type`, its body, and
+   `end proc name`. *)
 let parse_definition st (keyword : token) : Core.definition option =
   begin_line st keyword 0;
   advance st;
@@ -1021,16 +1207,17 @@ let parse_definition st (keyword : token) : Core.definition option =
       (* trace: D166. Parameters in `( )`, as before D165: refused with the `[ ]` form as the fix, and read on as if
          written in `[ ]`. Empty `( )` and `proc.main`'s get the messages `[ ]` would. *)
       (match peek st with
-      | Some o when is_symbol "(" o ->
+      | Some o when is_symbol "(" o -> (
           let rec find_close i depth =
             if i >= Array.length st.tokens || st.tokens.(i).line <> o.line then None
             else
               let t = st.tokens.(i) in
               if is_symbol "(" t then find_close (i + 1) (depth + 1)
-              else if is_symbol ")" t then if depth = 1 then Some i else find_close (i + 1) (depth - 1)
+              else if is_symbol ")" t then
+                if depth = 1 then Some i else find_close (i + 1) (depth - 1)
               else find_close (i + 1) depth
           in
-          (match find_close st.index 0 with
+          match find_close st.index 0 with
           | Some j ->
               let c = st.tokens.(j) in
               (match name with
@@ -1071,7 +1258,9 @@ let parse_definition st (keyword : token) : Core.definition option =
                       (M.message M.Refused
                          (M.point o.line o.column (c.column + 1 - o.column))
                          ~what:"`proc.main` takes nothing"
-                         ~why:"only the program's start runs `proc.main`, so it's never given anything.")
+                         ~why:
+                           "only the program's start runs `proc.main`, so it's never given \
+                            anything.")
                 | None -> expected st "`]`");
                 Ok []
             | Core.Named _ -> parse_parameters st o)
@@ -1084,14 +1273,14 @@ let parse_definition st (keyword : token) : Core.definition option =
       | Ok parameters -> (
           let returns =
             match peek st with
-            | Some r when is_word "returns" r -> (
+            | Some r when is_symbol "->" r -> (
                 advance st;
                 match parse_type st with Ok t -> Ok (Some t) | Error () -> Error ())
             | _ -> Ok None
           in
           (match peek st with
-          | Some f when is_word "fails" f || is_word "or" f ->
-              not_built st f "failures listed in a header, `fails` (D39),";
+          | Some f when is_symbol "!" f ->
+              not_built st f "failures listed in a header, `! [ … ]` (D39, D190),";
               st.stopped <- true
           | _ -> ());
           match returns with
@@ -1099,7 +1288,7 @@ let parse_definition st (keyword : token) : Core.definition option =
               st.stopped <- true;
               None
           | Ok returns ->
-              if not st.stopped then expect_opener_colon st;
+              if not st.stopped then expect_opener_end st;
               if st.stopped then None
               else begin
                 st.closers <- [ closer ];
@@ -1107,9 +1296,14 @@ let parse_definition st (keyword : token) : Core.definition option =
                 st.closers <- [];
                 if not st.stopped then parse_closer st 0 closer;
                 Some
-                  { Core.definition_name = name; definition_name_at = place_of_token name_token;
-                    definition_parameters = parameters; definition_returns = returns; definition_body = body;
-                    definition_at = place_of_token keyword }
+                  {
+                    Core.definition_name = name;
+                    definition_name_at = place_of_token name_token;
+                    definition_parameters = parameters;
+                    definition_returns = returns;
+                    definition_body = body;
+                    definition_at = place_of_token keyword;
+                  }
               end))
 
 (* trace: D97, D101, D102. Two or more blank lines in a row. *)
@@ -1118,15 +1312,19 @@ let check_blank_lines st =
   let rec go i =
     if i < count then
       if String.trim st.lines.(i).text = "" && not st.lines.(i).comment then begin
-        let rec run_end j = if j < count && String.trim st.lines.(j).text = "" then run_end (j + 1) else j in
+        let rec run_end j =
+          if j < count && String.trim st.lines.(j).text = "" then run_end (j + 1) else j
+        in
         let stop = run_end i in
         let extra = stop - i - 1 in
         if extra >= 1 then
           report st
-            (M.message M.Refused (M.point (i + 2) 1 1)
+            (M.message M.Refused
+               (M.point (i + 2) 1 1)
                ~what:
                  (Printf.sprintf "%d extra blank line%s, after the one on line %d" extra
-                    (if extra = 1 then "" else "s") (i + 1))
+                    (if extra = 1 then "" else "s")
+                    (i + 1))
                ~why:"one blank line is enough to separate the parts of a program.");
         go stop
       end
@@ -1134,15 +1332,78 @@ let check_blank_lines st =
   in
   go 0
 
+(* trace: D190, D192. The old spellings: a name after `$`, and `==` and `!=`. Each line with any is refused once, with
+   them all corrected as the fix (D100's one message per line), and its tokens read on as the new spellings. *)
+let old_spellings (l : Lexer.line) : Lexer.line * M.message option =
+  let changed (t : token) =
+    match t.kind with Dollar name -> name <> "" | Symbol ("==" | "!=") -> true | _ -> false
+  in
+  match List.filter changed l.tokens with
+  | [] -> (l, None)
+  | first :: _ as found ->
+      let fixed =
+        List.fold_left
+          (fun text (t : token) ->
+            match t.kind with
+            | Dollar _ -> M.replace_at text t.column 1 ""
+            | Symbol s ->
+                let word = if s = "==" then "eq" else "not_eq" in
+                let before = if t.column > 1 && text.[t.column - 2] <> ' ' then " " else "" in
+                let after =
+                  if
+                    t.column - 1 + t.width < String.length text
+                    && text.[t.column - 1 + t.width] <> ' '
+                  then " "
+                  else ""
+                in
+                M.replace_at text t.column t.width (before ^ word ^ after)
+            | _ -> text)
+          l.text (List.rev found)
+      in
+      let dollar = match first.kind with Dollar _ -> true | _ -> false in
+      let message =
+        M.message M.Refused
+          (M.point l.number first.column (if dollar then 1 else first.width))
+          ~fix:fixed
+          ~why:
+            (if dollar then "a name is a plain word, with no `$`."
+             else "`eq` and `not_eq` compare two values; Unio has no `==` or `!=`.")
+      in
+      let tokens =
+        List.map
+          (fun (t : token) ->
+            match t.kind with
+            | Dollar name when name <> "" ->
+                { t with kind = Word name; column = t.column + 1; width = t.width - 1 }
+            | Symbol "==" -> { t with kind = Word "eq" }
+            | Symbol "!=" -> { t with kind = Word "not_eq" }
+            | _ -> t)
+          l.tokens
+      in
+      ({ l with tokens }, Some message)
+
 (* Reads a whole file: gives the definitions read, the problems found, and whether checking stopped early. *)
 let parse ~file (lines : Lexer.line list) =
   current_file := file;
-  let lines = Array.of_list lines in
-  let tokens = Array.of_list (List.concat_map (fun (l : Lexer.line) -> l.tokens) (Array.to_list lines)) in
-  let st =
-    { tokens; lines; index = 0; problems = []; stopped = false; statement_line = 0; spread_reported = false;
-      closers = []; last_code_line = 0 }
+  let read = List.map old_spellings lines in
+  let lines = Array.of_list (List.map fst read) in
+  let tokens =
+    Array.of_list (List.concat_map (fun (l : Lexer.line) -> l.tokens) (Array.to_list lines))
   in
+  let st =
+    {
+      tokens;
+      lines;
+      index = 0;
+      problems = [];
+      stopped = false;
+      statement_line = 0;
+      spread_reported = false;
+      closers = [];
+      last_code_line = 0;
+    }
+  in
+  List.iter (fun (_, m) -> Option.iter (report st) m) read;
   check_blank_lines st;
   Array.iter
     (fun (l : Lexer.line) ->
@@ -1159,9 +1420,7 @@ let parse ~file (lines : Lexer.line list) =
       match peek st with
       | None -> List.rev acc
       | Some t when is_word "proc" t -> (
-          match parse_definition st t with
-          | Some d -> definitions (d :: acc)
-          | None -> List.rev acc)
+          match parse_definition st t with Some d -> definitions (d :: acc) | None -> List.rev acc)
       | Some t when is_word "extern" t ->
           not_built st t "procedures written in C++, `extern.cpp` (D36, D131),";
           st.stopped <- true;
@@ -1171,7 +1430,7 @@ let parse ~file (lines : Lexer.line list) =
           st.stopped <- true;
           List.rev acc
       | Some t when is_word "comment" t ->
-          not_built st t "block comments, `comment name:` (D74),";
+          not_built st t "block comments, `comment name` (D74),";
           st.stopped <- true;
           List.rev acc
       | Some t ->
@@ -1191,7 +1450,11 @@ let parse ~file (lines : Lexer.line list) =
   | None when not st.stopped ->
       for number = st.last_code_line + 1 to Array.length lines do
         let l = lines.(number - 1) in
-        if l.tokens = [] && l.comment && String.length l.text > 0 && (l.text.[0] = ' ' || l.text.[0] = '\t') then
+        if
+          l.tokens = [] && l.comment
+          && String.length l.text > 0
+          && (l.text.[0] = ' ' || l.text.[0] = '\t')
+        then
           report st
             (M.message M.Not_designed_yet (M.point number 1 1)
                ~what:"how a comment after the last line of code is indented isn't decided yet")

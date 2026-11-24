@@ -31,9 +31,14 @@ let point ?(file = 0) line column width = { file; line; carets = [ (column, max 
 
 (* Puts a message made while reading one file into that file. *)
 let in_file file m =
-  { m with
+  {
+    m with
     at = { m.at with file };
-    because = Option.map (fun (sentence, p) -> (sentence, Option.map (fun p -> { p with file }) p)) m.because }
+    because =
+      Option.map
+        (fun (sentence, p) -> (sentence, Option.map (fun p -> { p with file }) p))
+        m.because;
+  }
 
 let message ?fix ?what ?when_ ?because ?why kind at = { kind; at; fix; what; when_; because; why }
 
@@ -59,17 +64,22 @@ let render (files : (string * string array) array) (m : message) =
     else ""
   in
   let shown = m.at.line :: (match m.because with Some (_, Some p) -> [ p.line ] | _ -> []) in
-  let gutter = List.fold_left (fun widest n -> max widest (String.length (string_of_int n))) 2 shown in
+  let gutter =
+    List.fold_left (fun widest n -> max widest (String.length (string_of_int n))) 2 shown
+  in
   let show place =
     Buffer.add_string buffer (Printf.sprintf "%*d | %s\n" gutter place.line (source_line place));
-    let carets = Bytes.make (List.fold_left (fun far (c, w) -> max far (c - 1 + w)) 0 place.carets) ' ' in
+    let carets =
+      Bytes.make (List.fold_left (fun far (c, w) -> max far (c - 1 + w)) 0 place.carets) ' '
+    in
     List.iter (fun (c, w) -> Bytes.fill carets (c - 1) w '^') place.carets;
-    Buffer.add_string buffer (Printf.sprintf "%s | %s\n" (String.make gutter ' ') (Bytes.to_string carets))
+    Buffer.add_string buffer
+      (Printf.sprintf "%s | %s\n" (String.make gutter ' ') (Bytes.to_string carets))
   in
   let column = first_column m.at in
   Buffer.add_string buffer
-    (Printf.sprintf "%s: %s:%d:%d, line %d column %d\n" (kind_word m.kind) (name m.at.file) m.at.line column
-       m.at.line column);
+    (Printf.sprintf "%s: %s:%d:%d, line %d column %d\n" (kind_word m.kind) (name m.at.file)
+       m.at.line column m.at.line column);
   show m.at;
   Option.iter (fun fix -> Buffer.add_string buffer (labelled "fix:" ("`" ^ fix ^ "`"))) m.fix;
   Option.iter (fun what -> Buffer.add_string buffer (labelled "what:" what)) m.what;
@@ -103,9 +113,11 @@ let report_address = "https://github.com/Soclets/Unio-lang/issues"
 
 (* trace: D82, D92, D103 *)
 let internal_error problem =
-  Printf.sprintf "internal error: Ralph itself went wrong, not your program\n%s%s" (labelled "what:" problem)
+  Printf.sprintf "internal error: Ralph itself went wrong, not your program\n%s%s"
+    (labelled "what:" problem)
     (labelled "why:"
-       ("this is a bug in Ralph. Please report it at " ^ report_address ^ ", with the program that caused it."))
+       ("this is a bug in Ralph. Please report it at " ^ report_address
+      ^ ", with the program that caused it."))
 
 (* trace: D92, D103 *)
 let cant_read file reason = Printf.sprintf "can't read: %s\n%s" file (labelled "what:" reason)

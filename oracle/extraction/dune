@@ -4,7 +4,9 @@
  (theories Stdlib Ralph))
 
 ; Extracted code isn't written by hand, so warnings about its style are off; Rocq checks what it does.
+
 (library
  (name ralph_core)
  (modules core)
- (flags (:standard -w -a)))
+ (flags
+  (:standard -w -a)))

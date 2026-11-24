@@ -1,4 +1,5 @@
 ; Captures `Print Assumptions` for every main theorem; the test runner checks the file.
+
 (rule
  (targets assumptions.txt)
  (deps

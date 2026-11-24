@@ -1,9 +1,8 @@
 (* The syntax tree: a Unio program as the parser hands it to the core.
 
    Every part carries the place it was written, so a refusal or a failed check can point at it (D54). The shell's
-   parser builds this tree; the checker (Checker.v) and the evaluator (Evaluator.v) both read it. Names in the tree are
-   written without their `$` (D125): the `$` is how the parser tells a variable from a procedure, and the shell puts it
-   back when wording a message. *)
+   parser builds this tree; the checker (Checker.v) reads it and gives back the typed tree (TypedTree.v) that the
+   evaluator runs. *)
 
 From Stdlib Require Import String List ZArith.
 
@@ -20,24 +19,23 @@ Definition type_eqb (a b : type) : bool :=
   | _, _ => false
   end.
 
-(* An operator between two values (D17, D27, D28, D34, D59). *)
+(* An operator between two values (D17, D27, D34, D59, D190). *)
 Inductive binary_operator :=
-| Add | Subtract | Multiply | Join
+| Add | Subtract | Multiply
 | Equal | Not_equal | Less | Greater | At_least | At_most
 | And | Or.
 
-(* One piece of `.fmt` text (D29, D30, D133), as the parser reads it: plain text with its escapes taken out, a
-   variable's name in braces, a name in braces without its `$`, braces holding anything else, or a `{` that's never
-   closed. *)
+(* One piece of text, as the parser reads it (D29, D30, D175, D200): plain text with its escapes taken out, a name in
+   braces, a name in braces with a `places:` setting, braces holding anything else, or a `{` that's never closed. *)
 Inductive piece :=
 | Piece_text (text : string)
-| Piece_variable (name : string) (at_ : place)
-| Piece_bare_name (name : string) (at_ : place)
+| Piece_name (name : string) (at_ : place)
+| Piece_places (name : string) (at_ : place) (places : string) (places_at : place)
 | Piece_other (at_ : place)
 | Piece_unclosed (at_ : place).
 
-(* The word a call names, with its narrowings (D18): `show_msg.fmt.same_line` is the word `show_msg` with the
-   narrowings `fmt` and `same_line`. *)
+(* The word a call names, with its narrowings (D18): `show_msg.same_line` is the word `show_msg` with the narrowing
+   `same_line`. *)
 Record callee := {
   callee_word : string;
   callee_word_at : place;
@@ -55,11 +53,12 @@ Definition callee_at (c : callee) : place :=
 Inductive expression :=
 (* A whole number as written: its digits (D15). *)
 | Whole_literal (digits : string) (at_ : place)
-(* Text in double quotes (D21): its value with escapes taken out (D30), and its pieces if `.fmt` reads it (D29). *)
-| Text_literal (value : string) (pieces : list piece) (at_ : place)
+(* Text in double quotes (D21), as its pieces: every text fills in its braces (D200). *)
+| Text_literal (pieces : list piece) (at_ : place)
 | Bool_literal (value : bool) (at_ : place)
+(* A plain word where a value goes: a variable's name (D192), or a procedure's written without `( )`. *)
 | Variable_value (name : string) (at_ : place)
-(* A word with no `( )` after it, where a value goes. *)
+(* A word with narrowings and no `( )` after it, as `be.Text` in `x |> be.Text` but where a value goes. *)
 | Bare_word (word : string) (at_ : place)
 (* `-` right before a value (D27). *)
 | Negate (operand : expression) (at_ : place)
@@ -94,11 +93,11 @@ Inductive statement :=
 (* `let` or `var` (D13): whether it can change, its name, its type and first value. *)
 | Declare (changeable : bool) (name : string) (name_at keyword_at : place) (written : type)
     (value : expression) (at_ : place)
-(* `$name = value;` (D14). *)
+(* `name = value;` (D14). *)
 | Assign (name : string) (name_at : place) (value : expression) (operator_at at_ : place)
 (* A call or a slide standing alone (D120). *)
 | Run (action : expression) (at_ : place)
-(* `if`, its `else if` parts and `else:` (D16). *)
+(* `if`, its `else if` parts and `else` (D16). *)
 | If (condition : expression) (then_part : block) (rest : else_part) (at_ : place)
 | While (condition : expression) (body : block) (at_ : place)
 | Break (at_ : place)

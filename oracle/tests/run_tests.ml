@@ -16,7 +16,9 @@ let read_file path =
   | exception Sys_error message -> Error message
 
 let write_file path contents =
-  match Out_channel.with_open_bin path (fun channel -> Out_channel.output_string channel contents) with
+  match
+    Out_channel.with_open_bin path (fun channel -> Out_channel.output_string channel contents)
+  with
   | () -> Ok ()
   | exception Sys_error message -> Error message
 
@@ -84,7 +86,9 @@ let run_in folder program arguments input =
 let first_difference expected actual =
   let length = min (String.length expected) (String.length actual) in
   let rec find index =
-    if index >= length then length else if expected.[index] = actual.[index] then find (index + 1) else index
+    if index >= length then length
+    else if expected.[index] = actual.[index] then find (index + 1)
+    else index
   in
   find 0
 
@@ -96,8 +100,8 @@ let describe_difference what expected actual =
     let stop = min (String.length text) (at + 40) in
     String.escaped (String.sub text start (stop - start))
   in
-  Printf.sprintf "%s differs at byte %d:\n      expected: %s\n      got:      %s" what at (around expected)
-    (around actual)
+  Printf.sprintf "%s differs at byte %d:\n      expected: %s\n      got:      %s" what at
+    (around expected) (around actual)
 
 let optional_file path = if Sys.file_exists path then read_file path else Ok ""
 
@@ -143,7 +147,9 @@ let check_assumptions path =
   match read_file path with
   | Error message -> Fail [ message ]
   | Ok text ->
-      let lines = List.filter (fun line -> String.trim line <> "") (String.split_on_char '\n' text) in
+      let lines =
+        List.filter (fun line -> String.trim line <> "") (String.split_on_char '\n' text)
+      in
       let unexpected = List.filter (fun line -> line <> "Closed under the global context") lines in
       if lines = [] then Fail [ "no theorems were checked" ]
       else if unexpected = [] then Pass
@@ -178,7 +184,9 @@ let () =
         match Sys.getenv_opt "DUNE_SOURCEROOT" with Some root -> root | None -> Sys.getcwd ()
       in
       let tests_folder = Filename.concat (Filename.dirname source_root) "tests" in
-      let ralph = if Filename.is_relative ralph then Filename.concat (Sys.getcwd ()) ralph else ralph in
+      let ralph =
+        if Filename.is_relative ralph then Filename.concat (Sys.getcwd ()) ralph else ralph
+      in
       match Sys.readdir tests_folder with
       | exception Sys_error message ->
           prerr_endline ("can't read the tests: " ^ message);
@@ -220,7 +228,14 @@ let () =
           Printf.printf "%d of %d tests pass\n" passed (List.length results);
           let json =
             Printf.sprintf
-              "{\n  \"passed\": %d,\n  \"failed\": %d,\n  \"assumptions\": %s,\n  \"tests\": {\n%s\n  }\n}\n"
+              "{\n\
+              \  \"passed\": %d,\n\
+              \  \"failed\": %d,\n\
+              \  \"assumptions\": %s,\n\
+              \  \"tests\": {\n\
+               %s\n\
+              \  }\n\
+               }\n"
               passed failed
               (json_of_verdict assumptions_verdict)
               (String.concat ",\n"

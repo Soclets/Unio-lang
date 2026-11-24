@@ -1,26 +1,15 @@
 (* Which procedure a call names, shared by the checker and the evaluator so that both always agree.
 
-   The library's procedures (D6, D20, D22, D26, D29) are known by their word: `show_msg`, `be`, `ask` and `random`.
+   The built-in procedures (D6, D20, D22, D26, D196) are known by their word: `show_msg`, `be`, `ask` and `random`.
    Any other word names one of the program's own procedures. *)
 
 From Stdlib Require Import String List Bool.
-From Ralph Require Import Syntax Diagnostics.
+From Ralph Require Import Syntax Diagnostics TypedTree.
 Import ListNotations.
 Open Scope string_scope.
 
-Inductive library :=
-(* trace: D6, D29, D31 *)
-| Show_message (format same_line : bool)
-(* trace: D22, D29 *)
-| Convert_to_text (format : bool)
-(* trace: D22, D95 *)
-| Convert_to_whole
-(* trace: D20 *)
-| Ask_for_line
-(* trace: D26 *)
-| Random_number.
-
-Inductive target := Library (which : library) | User (procedure : definition).
+(* `be.Text` is a target of its own, since it takes a `Whole` or a `Bool` (D22, D153). *)
+Inductive target := Library (which : library) | Convert_to_text | User (procedure : definition).
 
 Inductive resolution := Resolved (to : target) | Unresolved (problems : list diagnostic).
 
@@ -63,49 +52,32 @@ Fixpoint written_twice (seen : list string) (narrowings : list (string * place))
       if existsb (String.eqb n) seen then Some (n, at_) else written_twice (n :: seen) rest
   end.
 
-(* trace: D6, D29, D31, D102 *)
+(* trace: D6, D102 *)
 Definition resolve_show (c : callee) : resolution :=
   let narrowings := callee_narrowings c in
   let unknown :=
     flat_map
       (fun '(n, at_) =>
-         if String.eqb n "fmt" || String.eqb n "same_line" then []
-         else [Refused (Unknown_narrowing "show_msg" n at_ ["fmt"; "same_line"])])
+         if String.eqb n "same_line" then [] else [Refused (Unknown_narrowing "show_msg" n at_ ["same_line"])])
       narrowings in
   match unknown with
   | _ :: _ => Unresolved unknown
   | [] =>
       match written_twice [] narrowings with
       | Some (n, at_) => Unresolved [Refused (Narrowing_twice n at_)]
-      | None =>
-          match narrowings with
-          | [(first, _); _] =>
-              if String.eqb first "same_line" then Unresolved [Refused (Narrowing_order (callee_at c))]
-              else Resolved (Library (Show_message true true))
-          | _ =>
-              Resolved (Library (Show_message (Nat.eqb (count_narrowing "fmt" narrowings) 1)
-                                              (Nat.eqb (count_narrowing "same_line" narrowings) 1)))
-          end
+      | None => Resolved (Library (Show_message (Nat.eqb (count_narrowing "same_line" narrowings) 1)))
       end
   end.
 
-(* trace: D22, D29, D87, D102, D103 *)
+(* trace: D22, D87, D102, D103 *)
 Definition resolve_be (c : callee) : resolution :=
   match callee_narrowings c with
   | [] => Unresolved [Refused (Be_without_type (callee_word_at c))]
   | (type_name, type_at) :: rest =>
       if String.eqb type_name "Text" then
         match rest with
-        | [] => Resolved (Library (Convert_to_text false))
-        | (n, at_) :: further =>
-            if String.eqb n "fmt" then
-              match further with
-              | [] => Resolved (Library (Convert_to_text true))
-              | (m, at_') :: _ =>
-                  Unresolved [Refused (if String.eqb m "fmt" then Narrowing_twice m at_'
-                                       else Narrowing_on_narrowed "be.Text.fmt" m at_')]
-              end
-            else Unresolved [Refused (Unknown_narrowing "be.Text" n at_ ["fmt"])]
+        | [] => Resolved Convert_to_text
+        | (n, at_) :: _ => Unresolved [Refused (Narrowing_on_narrowed "be.Text" n at_)]
         end
       else if String.eqb type_name "Whole" then
         match rest with
@@ -131,7 +103,7 @@ Definition resolve (p : program) (c : callee) : resolution :=
 Definition procedure_label (d : definition) : string :=
   match definition_name d with Main => "proc.main" | Named n => n end.
 
-(* A callee's name as written, as in `show_msg.fmt`, for messages. *)
+(* A callee's name as written, as in `show_msg.same_line`, for messages. *)
 Definition callee_name (c : callee) : string :=
   fold_left (fun so_far narrowing => so_far ++ "." ++ fst narrowing) (callee_narrowings c) (callee_word c).
 
@@ -156,7 +128,7 @@ Definition user_parameters (d : definition) : list (type * option string) :=
 (* The place an expression covers. *)
 Definition expression_at (e : expression) : place :=
   match e with
-  | Whole_literal _ at_ | Text_literal _ _ at_ | Bool_literal _ at_ | Variable_value _ at_
+  | Whole_literal _ at_ | Text_literal _ at_ | Bool_literal _ at_ | Variable_value _ at_
   | Bare_word _ at_ | Negate _ at_ | Not _ at_ | Binary _ _ _ _ at_ | Bracketed _ at_ | Call _ _ at_
   | Fallback _ _ _ at_ | Slide _ _ at_ | Broken at_ => at_
   end.

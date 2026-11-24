@@ -45,90 +45,94 @@ To run a program by hand: `opam exec --switch=ralph -- dune exec --root oracle -
   `break`, slides, `.fmt` braces, failures, and the program's shape. The core gives back each refusal as data; the
   shell only words it (D54).
 
-## Plan for the first milestone
+## Plan for all of Unio (from 2026-11-24)
 
-Each step ends with something running. Proofs grow with the core rather than at the end.
+The job: build every decision, D1 to D203, except `extern.cpp`'s C++ bodies, build modes and speed, colours and fonts,
+and what the standard marks Not decided (which stops with `NotDesignedYet`). Done when every test passes, the proofs
+below hold with nothing in `Print Assumptions` beyond the axioms file, and `check/` compares Ralph with `Beta++`.
 
-1. [x] Test runner, in OCaml, and every test failing.
-2. [x] Hello world end to end: lexer and parser for `proc.main` and `show_msg`, the core's syntax tree, checker and
-   evaluator, extraction, the shell printing. `d04_hello_world` passes.
-3. [x] Values and `Whole` arithmetic in Rocq: `Whole` as Rocq's exact integers (`Z`), kept in range by D46's
-   overflow check; `be.Text` and `be.Whole` (D95). **Prove** that `+`, `-`, `*` and negation are exact when the result
-   fits and stop with the overflow check otherwise. `d13_variables`, `d104_open_line`.
-4. [x] Variables, `if`, `while`, `break`, conditions, `and`/`or`/`not` stopping early. `d16_if`, `d19_while`,
-   `d34_logic`, `d06_same_line`.
-5. [x] Text: `&`, escapes, `.fmt`. `d28_join_text`, `d29_fmt`, `d30_escapes`.
-6. [x] Procedures, `returns`, `return`, labels, slides; `ask`, `??`, `random`. `d05_slides`, `d24_procedures`,
-   `d20_ask`, and the guessing game played by hand.
-7. [x] **Prove type safety** for the subset: a program the checker accepts never gets stuck.
-8. [x] The refusals the tests check, in the shell and the core, with D54's layout and D86's column.
-9. [x] Every other decided refusal in the subset, or `NotBuiltYet` where it isn't built, so Ralph never accepts a
-   program the standard refuses.
-10. [x] Review the theorems' statements with the design session; report to Tankun.
+Each checkpoint ends with something running, committed and pushed.
+
+1. [x] **The new spellings (D187, D190 to D203)**, built together with checkpoint 2: names with no `$` (D192), keywords and
+   built-ins (D196), opening lines with no `:` (D199), `-> Type` and `! [ … ]` (D190), `eq` and `not_eq`, `labels [ … ]`
+   (D195), every text filling its braces, a `Bool` included, with `\{` (D200, D202), no `&` (D201), conditions must be
+   `Bool`s (D187). Every test the first milestone passed passes again (37 of 53 on 2026-11-24).
+2. [x] **A typed tree for the core.** The checker gives back, with its refusals, the program as a typed tree: names
+   resolved, labels put in order, slides turned into calls, text's braces into joins. A small second type checker reads
+   that tree, and the evaluator runs it. Type safety is re-proven on the typed tree, which keeps the proof the size of
+   the language rather than the size of its messages. The same tests pass.
+3. [ ] **Lists, arrays and loops:** `List<T>`, `List<T>[len.max: n]`, `Array<T>[len: n]`, `[ … ]`, `[]`, `[all: v]`,
+   `pos:` and `offset:`, `.len`, `.add`, `.remove`, setting an item, `range[…]` with `step_by:`, `for each` with
+   `at pos` and `at offset`, and D173. `/`, `div.floor`, `div.trunc`, `rem.floor`, `rem.trunc` (D70, D71, D72), with
+   their checks. Proved: type safety for all of it; dividing and remainders exact.
+4. [ ] **Failures in full:** `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash` (D152, status 5),
+   `otherwise` with `case` and `instead`, D186, handler families, `include`, handler parameters, `.*`; procedure
+   families (`fam.proc`, D41); comments (`//`, `///`, `comment` blocks, D74).
+5. [ ] **Floats:** `Float`, literals with `~` (D155, D180), `+ - * /` and `sqrt` with D177's check, comparisons and
+   D184, `be.Float`, `be.Whole.floor`/`.trunc`/`.ceil`/`.nearest`/`.nearest.even` (D178), `be.Text` of a `Float`
+   (D155, D181 to D183), `places:` (D175, D176). Proved with Flocq: each operation gives the nearest `Float`, ties to
+   even, or stops; each rounding to `Whole` gives D178's number or stops.
+6. [ ] **Every other decided refusal,** with drafted wordings sent to the design session in batches.
+7. [ ] **`check/`:** a generator written from `standard/`, one printer, a list of what it doesn't generate yet, and a
+   comparison of Ralph with `Beta++` in both modes on every generated program and test, shrinking any difference.
 
 ### Order of proofs
 
-1. `Whole` arithmetic is exact (step 3): small and self-contained.
-2. Type safety (step 7), by the "definitional interpreter" method: the evaluator runs with fuel (a counter that
-   shrinks each step, since Rocq only accepts functions that finish), and the proof goes by induction on the fuel,
-   showing that a well-typed statement or expression always gives a value of its type, a runtime stop, or runs out of
-   fuel, never "stuck".
+1. Type safety on the typed tree (checkpoint 2), growing with each checkpoint after it.
+2. `Whole` arithmetic exact (kept), and `/`, `div`, `rem` exact or stopping (checkpoint 3).
+3. `Float` operations correctly rounded (checkpoint 5), with Flocq; then D178's roundings to `Whole`.
+4. Showing a `Float` as text: proved where it can be, otherwise in the shell, tested against Python's `repr`.
 
-## How the core runs input and output
+### Readings the new decisions overtake
 
-The evaluator is pure: instead of printing or reading, it gives back a tree of requests ("show this", "need a line
-of input", "need a random number from 1 to 100"), each carrying what to do next with the answer. The shell walks the
-tree, doing the real printing and reading. Type safety is stated over every path through that tree, for every
-possible input.
+- Reading 10 (names in messages keep their `$`): gone with D192.
+- `Condition_not_bool` (`NotDesignedYet`): refused now (D187).
+- `Format_bool` (`NotDesignedYet`): a `Bool` fills in as `true` or `false` (D202).
+- Everything about `.fmt` (D29, D133): every text fills its braces (D200), and D133's refusal goes (D192).
+- `&` and D72's refusal of `&` beside maths: gone (D201).
+- D8's missing `:` refusal: gone; an opening line ending in `:` is refused instead (D199).
 
 ## Status
 
-**2026-11-21: the first milestone is reached (D140).** All 27 tests pass byte for byte; the guessing game runs; and
-three theorems are proven in Rocq, each with `Print Assumptions` showing nothing:
-- `whole_arithmetic_exact` and `whole_negate_exact` (core/Whole.v), approved by the design session;
-- `type_safety` (core/Safety.v), approved by the design session.
+2026-11-24: checkpoints 1 and 2 are done. The core is now `Syntax.v` (what the parser gives), `Checker.v` (refusals
+and the typed tree), `TypedTree.v` (the typed tree and its second type checker), `Evaluator.v` (runs the typed tree)
+and `Safety.v` (type safety, proven about the second type checker, with nothing in `Print Assumptions`). 37 of 53
+tests pass; the 16 left need lists, `for each`, floats and `otherwise`.
 
-Also built since: D142 to D148, spacing (D98, D100, D102, D132), and knock-on errors (D55 rule 4, D83). Ralph stops
-here, as the milestone says: the compiler starts next, and Tankun decides when.
+## Wording drafts (sent to the design session in batches)
 
-Still `NotBuiltYet` in Ralph (decided, not built), each saying so when a program uses it:
-- an operator after a slide's step, refused with brackets as the fix (D81, D128);
-- D61's shared type in front of parameters, refused with D126's form as the fix (D126, D132);
-- lists, dividing and remainders, `?`, `?? ignore`, `?? crash`, `otherwise:`, families, handlers, `extern.cpp`,
-  block and doc comments, packages, methods (outside the milestone's subset).
+Built with these meanwhile. Batch 1, sent 2026-11-24:
+1. **A name written with `$` (D192):** `fix:` the line without the `$`s; `why:` "a name is a plain word, with no `$`."
+2. **`==` or `!=` (D190):** `fix:` the line with `eq` or `not_eq`; `why:` "`eq` and `not_eq` compare two values;
+   Unio has no `==` or `!=`."
+3. **`&` (D201):** `what:` "`&` isn't how Unio joins text"; `why:` "text is joined by filling it in with braces, as in
+   `"{first} {last}"`."
+4. **An opening line ending in `:` (D199):** `fix:` the line without it; `why:` "a block's opening line ends with
+   nothing; `end` shows where the block ends."
+5. **A `labels` line without `[ ]` (D195):** `fix:` the line with them; `why:` "a `labels` line puts its pairs in
+   `[ ]`."
+6. **A condition that isn't a `Bool` (D187):** for a `Whole`, `fix:` the line with ` not_eq 0` after the condition;
+   otherwise `what:` "this condition is a `Text`, but a condition is a `Bool`"; `why:` "a condition is a `Bool`; a
+   number or text doesn't stand for true or false."
+7. **`places:` on anything but a `Float` (D175):** `what:` "`places:` rounds a `Float`, but `won` is a `Bool`"; `why:`
+   "`places:` says how many digits after the point a `Float` shows."
+8. **`+` on two texts that aren't both quotes or names (D201):** no `fix:` can be shown, so D89's `what:` "`+` works on
+   two `Whole`s, but this is a `Text` and a `Text`", with D201's `why:`.
+9. **A variable with a built-in's name, as `let show_msg: Whole = 1;` (D102, D192):** D102's wording with no
+   `because:`, since a built-in has no line to show.
 
-Fixed after the milestone (2026-11-21): any procedure calling itself crashed Ralph, found by the compiler session.
-OCaml works out a function's arguments first, so the evaluator built both ways of every `if`; each way is now a
-function, called only when taken. Question sent: what Unio says when calls nest too deep for the machine; answered by D154. Six recursion tests suggested to the design session.
-
-D166 (parameters in `( )` refused with the `[ ]` form as the fix) is built. Ralph now reads every `.unio` file in the
-given file's folder as one program (D64): places carry a file number, files go in order of their names (so the first
-`proc.main` is the one in the alphabetically first file), and a `because:` into another file names it (D161). Four
-`NotBuiltYet` messages now say "isn't" for a single thing (D103). 39 of 39 tests pass.
-
-D165 (parameters in `[ ]`), D160 (backwards `random`: refused with plain numbers, a failed check otherwise) and D161
-(value-only lines, lines outside a procedure, unknown types, `not`/`and`/`or` on non-`Bool`s) are built; 38 of 38
-tests pass. D158 fixes the call limit at 1,000,000, which Ralph already had. `Float` (D157, D162, D163) is outside the
-subset and stops with `NotBuiltYet`. Whether an `if` or `while` condition must be a `Bool` is still not decided.
-
-D154 is built: calls nesting deeper than 1,000,000 stop with `check failed:`, status 4; the evaluator now carries how
-deep it is and which procedure it's in (`frame` in core/Evaluator.v). Ralph's own stack running out is still an
-internal error, status 7, as a last guard. D156 names `be.Whole`'s failure `not_a_whole`, for `?? crash` (D152), which
-isn't built yet.
-
-D153 (`be.Text` of a `Bool`) is built; the six recursion tests and d153's test pass, 34 of 34. D152 (`?? crash`) is
-outside the milestone's subset and stays `NotBuiltYet`; for `be.Whole` its `what:` also needs the failure's name,
-which isn't decided.
-
-Reading 8 (`while` and D57) became D149, which Ralph already follows. Its example breaks D9; sent to the design
-session on 2026-11-21.
+Decided wordings brought up to date with later decisions, as `Wording.ml` says: D88's `returns` now reads `->`
+(D190); D87's `otherwise:` reads `otherwise` and D102's `else:` reads `else` (D199); D92's "braces in `.fmt` text" reads
+"braces in text" (D200).
 
 ## Theorem statements sent to the design session
 
 - `whole_arithmetic_exact` (core/Whole.v): for any two whole numbers, `+`, `-` and `*` give the mathematically exact
   answer whenever it fits in a `Whole`; when the exact answer is bigger than the largest `Whole` they stop with D46's
   overflow check saying "too big", and when smaller than the smallest, "too small". Sent 2026-11-21.
-- `type_safety` (core/Safety.v): if the checker accepts a program, running it never gets stuck. However the input
+- `type_safety` (core/Safety.v), re-proven 2026-11-24 on the typed tree, statement unchanged: "the checker accepts"
+  now includes the second type checker agreeing. Sent again 2026-11-24.
+- `type_safety` as first sent: if the checker accepts a program, running it never gets stuck. However the input
   goes and whatever random numbers come back, every way through it ends by reaching the end of `proc.main`, by a
   failed runtime check (D46's overflow), by a stop for something not decided yet (`random` with `from:` above `to:`),
   by `ask` finding no more input, or is still running when the fuel runs out. Sent 2026-11-21.

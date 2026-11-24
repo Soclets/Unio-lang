@@ -1,11 +1,9 @@
 ; The one command: dune build @check -j 3
 ; builds everything, checks every proof and its assumptions, and runs every test.
+
 (rule
  (alias check)
- (deps
-  (universe)
-  shell/ralph.exe
-  assumptions/assumptions.txt)
+ (deps (universe) shell/ralph.exe assumptions/assumptions.txt)
  (action
   (run
    %{exe:tests/run_tests.exe}

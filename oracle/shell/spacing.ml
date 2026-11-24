@@ -1,4 +1,4 @@
-(* Spacing (D18, D27, D98, D100, D102, D132): spacing is fixed, and anything else is refused with the corrected line.
+(* Spacing (D18, D27, D98, D100, D102, D132, D190): spacing is fixed, and anything else is refused with the corrected line.
 
    Every gap between two tokens on a line has one right width, worked out from the two tokens:
    - none before `;`, `,`, `)`, `]` and `:`, none after `(` and `[`, and none on either side of a narrowing's `.`;
@@ -21,14 +21,20 @@ type mistake = {
   after : token option;
 }
 
-let operators = [ "="; "=="; "!="; "<"; ">"; "+"; "-"; "*"; "/"; "&"; "|>"; "??" ]
-let word_operators = [ "and"; "or"; "not"; "at_least"; "at_most"; "div"; "rem" ]
+let operators = [ "="; "=="; "!="; "<"; ">"; "+"; "-"; "*"; "/"; "&"; "|>"; "??"; "->"; "!" ]
+let word_operators = [ "and"; "or"; "not"; "at_least"; "at_most"; "div"; "rem"; "eq"; "not_eq" ]
 
 (* Words after which a `-` negates, as after an operator. *)
-let leads_into_value = [ "return"; "and"; "or"; "not"; "if"; "while"; "at_least"; "at_most"; "else" ]
+let leads_into_value =
+  [
+    "return"; "and"; "or"; "not"; "if"; "while"; "at_least"; "at_most"; "else"; "eq"; "not_eq"; "in";
+  ]
 
 let is_operator t =
-  match t.kind with Symbol s -> List.mem s operators | Word w -> List.mem w word_operators | _ -> false
+  match t.kind with
+  | Symbol s -> List.mem s operators
+  | Word w -> List.mem w word_operators
+  | _ -> false
 
 let symbol_is s t = match t.kind with Symbol s' -> s = s' | _ -> false
 
@@ -51,7 +57,7 @@ let right_gap tokens index =
   else if symbol_is "-" a && negates tokens index then 0
   else if symbol_is "(" b then
     match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1
-  (* trace: D165. No space before the `[` after a name or a type. *)
+    (* trace: D165. No space before the `[` after a name or a type. *)
   else if symbol_is "[" b then
     match a.kind with Word w when not (Parser.is_keyword w) -> 0 | Dollar _ -> 0 | _ -> 1
   else 1
@@ -62,38 +68,50 @@ let quoted t = "`" ^ describe t.kind ^ "`"
 let one_why m =
   match (m.before, m.after) with
   | None, _ -> "a line never ends with spaces."
-  | Some a, Some b when symbol_is "." a || symbol_is "." b -> "a narrowing's `.` touches the words on both sides."
-  | Some a, Some _ when symbol_is "-" a && m.right = 0 -> "a `-` that makes a value negative has no space after it."
-  | Some a, Some b when m.right = 0 -> Printf.sprintf "no space goes between %s and %s." (quoted a) (quoted b)
+  | Some a, Some b when symbol_is "." a || symbol_is "." b ->
+      "a narrowing's `.` touches the words on both sides."
+  | Some a, Some _ when symbol_is "-" a && m.right = 0 ->
+      "a `-` that makes a value negative has no space after it."
+  | Some a, Some b when m.right = 0 ->
+      Printf.sprintf "no space goes between %s and %s." (quoted a) (quoted b)
   | Some _, Some _ when m.width >= 2 -> "spaces never come two in a row, outside indentation."
   | Some a, Some b ->
-      if is_operator a then Printf.sprintf "%s between two values has one space on each side." (quoted a)
-      else if is_operator b then Printf.sprintf "%s between two values has one space on each side." (quoted b)
+      if is_operator a then
+        Printf.sprintf "%s between two values has one space on each side." (quoted a)
+      else if is_operator b then
+        Printf.sprintf "%s between two values has one space on each side." (quoted b)
       else Printf.sprintf "%s and %s have one space between them." (quoted a) (quoted b)
   | Some _, None -> "spaces never come two in a row, outside indentation."
 
 let several_why =
-  "spacing follows one rule: one space around operators and after `,` and `:`, none inside brackets or before a \
-   call's `(`, never two in a row, and none at the end of a line."
+  "spacing follows one rule: one space around operators and after `,` and `:`, none inside \
+   brackets or before a call's `(`, never two in a row, and none at the end of a line."
 
 (* Checks one line; gives its message, if it has any mistakes. *)
 let check_line (l : Lexer.line) : M.message option =
   let text = l.text in
-  let rec last_non_space i = if i > 0 && (text.[i - 1] = ' ' || text.[i - 1] = '\t') then last_non_space (i - 1) else i in
+  let rec last_non_space i =
+    if i > 0 && (text.[i - 1] = ' ' || text.[i - 1] = '\t') then last_non_space (i - 1) else i
+  in
   let stop = last_non_space (String.length text) in
   if l.tokens = [] then
     if (not l.comment) && text <> "" then
       (* trace: D98, D102 *)
       Some
-        (M.message M.Refused (M.point l.number 1 (String.length text)) ~fix:""
-           ~why:"a blank line has no spaces on it.")
+        (M.message M.Refused
+           (M.point l.number 1 (String.length text))
+           ~fix:"" ~why:"a blank line has no spaces on it.")
     else if l.comment && stop < String.length text then
       Some
         (M.message M.Refused
            (M.point l.number (stop + 1) (String.length text - stop))
            ~fix:(String.sub text 0 stop) ~why:"a line never ends with spaces.")
     else None
-  else if List.exists (fun t -> match t.kind with Unknown _ | Unclosed_text _ -> true | _ -> false) l.tokens then None
+  else if
+    List.exists
+      (fun t -> match t.kind with Unknown _ | Unclosed_text _ -> true | _ -> false)
+      l.tokens
+  then None
   else
     let tokens = Array.of_list l.tokens in
     let count = Array.length tokens in
@@ -113,13 +131,24 @@ let check_line (l : Lexer.line) : M.message option =
     let after_last = last.column + last.width in
     let end_mistakes =
       if stop < String.length text then
-        [ { column = stop + 1; width = String.length text - stop; right = 0; before = None; after = None } ]
+        [
+          {
+            column = stop + 1;
+            width = String.length text - stop;
+            right = 0;
+            before = None;
+            after = None;
+          };
+        ]
       else []
     in
     let comment_mistakes =
       if l.comment && stop > after_last then
         let comment_at =
-          let rec find i = if i + 1 < String.length text && text.[i] = '/' && text.[i + 1] = '/' then i else find (i + 1) in
+          let rec find i =
+            if i + 1 < String.length text && text.[i] = '/' && text.[i + 1] = '/' then i
+            else find (i + 1)
+          in
           find (after_last - 1)
         in
         let width = comment_at + 1 - after_last in
@@ -144,7 +173,9 @@ let check_line (l : Lexer.line) : M.message option =
             (List.sort (fun a b -> compare a.column b.column) mistakes)
         in
         (* Gaps on both sides of one operator, or of one narrowing's `.`, are one mistake (D102). *)
-        let same (t : token) (u : token option) = match u with Some (u : token) -> u.column = t.column | None -> false in
+        let same (t : token) (u : token option) =
+          match u with Some (u : token) -> u.column = t.column | None -> false
+        in
         let shared =
           match mistakes with
           | [ a; b ] -> (
@@ -157,7 +188,8 @@ let check_line (l : Lexer.line) : M.message option =
           match (mistakes, shared) with
           | [ m ], _ -> one_why m
           | _, Some t when symbol_is "." t -> "a narrowing's `.` touches the words on both sides."
-          | _, Some t when is_operator t -> Printf.sprintf "%s between two values has one space on each side." (quoted t)
+          | _, Some t when is_operator t ->
+              Printf.sprintf "%s between two values has one space on each side." (quoted t)
           | _ -> several_why
         in
         Some (M.message M.Refused { M.file = 0; line = l.number; carets } ~fix:fixed ~why)
