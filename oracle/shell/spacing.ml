@@ -88,7 +88,8 @@ let right_gap ?(types = [||]) tokens index =
     let symbol_in list t = match t.kind with Symbol s -> List.mem s list | _ -> false in
     (* trace: D23. `?` touches the call before it. *)
     if symbol_in [ ";"; ","; ")"; "]"; ":"; "."; "?" ] b then 0
-    else if symbol_in [ "("; "["; "." ] a then 0
+    (* trace: D155. `~` touches the number it marks. *)
+    else if symbol_in [ "("; "["; "."; "~" ] a then 0
     else if symbol_is "-" a && negates tokens index then 0
     else if symbol_is "(" b then
       match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1

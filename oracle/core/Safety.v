@@ -12,7 +12,8 @@
    [Stuck]; and a failure passed up with `?` is always one its procedure lists. *)
 
 From Stdlib Require Import String List Bool ZArith Lia.
-From Ralph Require Import Whole Syntax Io TypedTree Checker Evaluator.
+From Flocq Require Import IEEE754.BinarySingleNaN.
+From Ralph Require Import Whole Float Syntax Io TypedTree Checker Evaluator.
 Import ListNotations.
 Import Typed.
 Open Scope list_scope.
@@ -26,6 +27,8 @@ Fixpoint has_type (t : type) (v : value) {struct v} : Prop :=
   | Whole_value _ => t = Whole
   | Bool_value _ => t = Bool
   | Text_value _ => t = Text
+  (* A `Float` is always a real number, never infinite or NaN (D177). *)
+  | Float_value f => t = Float /\ is_finite f = true
   | List_value items =>
       match item_of t with
       | Some item =>
@@ -61,7 +64,7 @@ Proof. intros [x |] [y |]; simpl; intros H; try discriminate; try reflexivity. a
 
 Lemma type_eqb_true : forall a b, type_eqb a b = true -> a = b.
 Proof.
-  induction a as [| | | x IH m | x IH m]; intros [| | | y n | y n]; simpl; intros H; try discriminate; try reflexivity;
+  induction a as [| | | | x IH m | x IH m]; intros [| | | | y n | y n]; simpl; intros H; try discriminate; try reflexivity;
     apply andb_true_iff in H; destruct H as [H1 H2]; apply IH in H1; subst.
   - apply option_Z_eqb_true in H2; subst; reflexivity.
   - apply Z.eqb_eq in H2; subst; reflexivity.
@@ -189,9 +192,19 @@ Proof. intros up at_ [n | |] op; simpl; [constructor; reflexivity | fine | fine]
 
 Lemma safe_need_bool : forall (A : Type) fine (P : A -> Prop) v (a b : unit -> io A),
   has_type Bool v -> safe_stopping fine P (a tt) -> safe_stopping fine P (b tt) -> safe_stopping fine P (need_bool v a b).
-Proof. intros A fine P [n | [|] | t | l] a b H Ha Hb; simpl in *; try discriminate; try contradiction; assumption. Qed.
+Proof.
+  intros A fine P [n | [|] | t | f | l] a b H Ha Hb; simpl in *; try discriminate; try contradiction; try assumption.
+  destruct H as [H _]; discriminate.
+Qed.
 
-Ltac wrong H := simpl in H; try discriminate; try contradiction.
+Ltac wrong H := simpl in H; try discriminate; try contradiction;
+  try (match type of H with _ /\ _ => let Hw := fresh "Hw" in destruct H as [Hw _]; discriminate Hw end).
+
+Lemma bcompare_finite : forall x y : float, is_finite x = true -> is_finite y = true -> exists c, Bcompare x y = Some c.
+Proof.
+  intros [sx | sx | | sx mx ex Bx] [sy | sy | | sy my ey By] Fx Fy; simpl in Fx, Fy; try discriminate;
+    unfold Bcompare; simpl; eexists; reflexivity.
+Qed.
 
 Lemma safe_compare : forall up operator t a b,
   comparable operator t = true -> has_type t a -> has_type t b ->
@@ -199,29 +212,35 @@ Lemma safe_compare : forall up operator t a b,
 Proof.
   intros up operator t a b C Ha Hb.
   destruct t; simpl in C; try (destruct operator; discriminate);
-    destruct a; simpl in Ha; try discriminate; try contradiction;
-    destruct b; simpl in Hb; try discriminate; try contradiction;
-    destruct operator; simpl in *; try discriminate; constructor; reflexivity.
+    destruct a; wrong Ha; destruct b; wrong Hb.
+  all: destruct operator; simpl in *; try discriminate; try (constructor; reflexivity).
+  all: destruct Ha as [_ Fa]; destruct Hb as [_ Fb]; destruct (bcompare_finite _ _ Fa Fb) as [c Ec]; rewrite Ec;
+    constructor; reflexivity.
 Qed.
 
-Lemma safe_text_of : forall up t v, shown t = true -> has_type t v -> safe_stopping (stops_ok up) (has_type Text) (text_of v).
+
+Lemma safe_text_of : forall up t v at_, shown t = true -> has_type t v ->
+  safe_stopping (stops_ok up) (has_type Text) (text_of v at_).
 Proof.
-  intros up t [n | b | s | l] Sg H; simpl in H; subst; simpl in Sg; try discriminate;
-    try (constructor; reflexivity).
-  destruct t; simpl in *; try discriminate; contradiction.
+  intros up t [n | b | s | f | l] at_ Sg H; simpl in H.
+  - subst. constructor. reflexivity.
+  - subst. constructor. reflexivity.
+  - subst. simpl in Sg. discriminate.
+  - simpl. destruct (text_of_float f); [constructor; reflexivity | fine].
+  - destruct t; simpl in *; try discriminate; contradiction.
 Qed.
 
 Lemma safe_join : forall up values, Forall (has_type Text) values -> safe_stopping (stops_ok up) (has_type Text) (join_texts values).
 Proof.
   intros up values H; induction H as [| v vs Hv Hvs IH]; simpl; [constructor; reflexivity |].
-  destruct v as [n | b | t | l]; wrong Hv.
-  eapply safe_bind; [exact IH |]. intros [m | c | u | k] Hu; wrong Hu. constructor; reflexivity.
+  destruct v as [n | b | t | f | l]; wrong Hv.
+  eapply safe_bind; [exact IH |]. intros [m | c | u | g | k] Hu; wrong Hu. constructor; reflexivity.
 Qed.
 
 Lemma safe_divide : forall up way a b at_, has_type Whole a -> has_type Whole b ->
   safe_stopping (stops_ok up) (has_type Whole) (divide_values way a b at_).
 Proof.
-  intros up way [x | | | ] [y | | | ] at_ Ha Hb; wrong Ha; wrong Hb. simpl.
+  intros up way [x | | | | ] [y | | | | ] at_ Ha Hb; wrong Ha; wrong Hb. simpl.
   destruct (whole_divide way x y); [constructor; reflexivity | fine | fine | fine].
 Qed.
 
@@ -287,12 +306,33 @@ Proof.
   apply H. apply offset_in in O. lia.
 Qed.
 
+Lemma keep_finite_fits : forall w z, keep_finite w = Float_fits z -> is_finite z = true.
+Proof. intros w z H. unfold keep_finite in H. destruct (is_finite w) eqn:F; inversion H; subst; exact F. Qed.
+
+Lemma float_arithmetic_fits : forall operator x y z, float_arithmetic operator x y = Float_fits z -> is_finite z = true.
+Proof.
+  intros [] x y z H; simpl in H; try (eapply keep_finite_fits; exact H).
+  destruct (is_zero y); [discriminate | eapply keep_finite_fits; exact H].
+Qed.
+
+Lemma float_sqrt_fits : forall x z, float_sqrt x = Float_fits z -> is_finite z = true.
+Proof.
+  intros [s | s | | [|] m e B] z H; simpl in H; try discriminate; eapply keep_finite_fits; exact H.
+Qed.
+
+Lemma safe_checked_float : forall up at_ r operation x y, (forall z, r = Float_fits z -> is_finite z = true) ->
+  safe_stopping (stops_ok up) (has_type Float) (checked_float at_ r operation x y).
+Proof.
+  intros up at_ r operation x y H. destruct r as [z | | |]; simpl; try fine.
+  constructor. simpl. split; [reflexivity | apply H; reflexivity].
+Qed.
+
 Lemma apply_library_safe : forall up which values at_ takes gives failures,
   library_signature which = Some (takes, gives, failures) -> Forall2 has_type takes values ->
   safe_stopping (stops_ok up) (outcome_ok gives failures) (apply_library which values at_).
 Proof.
   intros up which values at_ takes gives failures Sg H.
-  destruct which as [same_line | | | | container | container from_one | container from_one | container from_one];
+  destruct which as [same_line | | | | | container | container from_one | container from_one | container from_one];
     simpl in Sg.
   - inversion Sg; subst. inversion H as [| ? v ? ? Hv H']; subst; inversion H'; subst.
     destruct v; wrong Hv. simpl. constructor. constructor. reflexivity.
@@ -303,20 +343,24 @@ Proof.
     destruct v; wrong Hv. destruct w; wrong Hw. simpl.
     destruct (_ <=? _)%Z; [constructor; intros m; constructor; exists Whole; split; reflexivity | fine].
   - inversion Sg; subst. inversion H as [| ? v ? ? Hv H']; subst; inversion H'; subst.
+    destruct v as [| | | x |]; wrong Hv. destruct Hv as [_ Fx]. simpl.
+    eapply safe_bind; [apply safe_checked_float; intros z E; eapply float_sqrt_fits; exact E |].
+    intros v Hv. constructor. exists Float. split; [reflexivity | exact Hv].
+  - inversion Sg; subst. inversion H as [| ? v ? ? Hv H']; subst; inversion H'; subst.
     destruct v; wrong Hv. simpl.
     destruct (whole_of_text t); [constructor; exists Whole; split; reflexivity | constructor; simpl; auto].
-  - destruct container as [| | | item most | item length]; inversion Sg; subst.
+  - destruct container as [| | | | item most | item length]; inversion Sg; subst.
     inversion H as [| ? v ? ? Hv H']; subst; inversion H' as [| ? w ? ? Hw H'']; subst; inversion H''; subst.
-    destruct v as [| | | items]; try (simpl in Hv; discriminate). cbn [apply_library].
+    destruct v as [| | | | items]; [wrong Hv | wrong Hv | wrong Hv | wrong Hv |]. cbn [apply_library].
     destruct (has_room (List_of item most) items) eqn:R.
     + constructor. exists (List_of item most). split; [reflexivity |].
       apply (list_typed (List_of item most) item); [reflexivity |].
       apply Forall_app. split; [apply (list_typed (List_of item most) item); [reflexivity | exact Hv] | constructor; auto].
     + constructor. simpl. destruct most; [left; reflexivity |]. simpl in R. discriminate.
-  - destruct container as [| | | item most | item length]; inversion Sg; subst.
+  - destruct container as [| | | | item most | item length]; inversion Sg; subst.
     inversion H as [| ? v ? ? Hv H']; subst; inversion H' as [| ? w ? ? Hw H'']; subst;
       inversion H'' as [| ? z ? ? Hz H''']; subst; inversion H'''; subst.
-    destruct v as [| | | items]; try (simpl in Hv; discriminate). destruct z as [k | | | ]; wrong Hz. cbn [apply_library].
+    destruct v as [| | | | items]; [wrong Hv | wrong Hv | wrong Hv | wrong Hv |]. destruct z as [k | | | | ]; wrong Hz. cbn [apply_library].
     destruct (insert_offset _ _ _) as [n |]; [| fine].
     destruct (has_room (List_of item most) items) eqn:R.
     + constructor. exists (List_of item most). split; [reflexivity |].
@@ -324,18 +368,17 @@ Proof.
       apply (list_typed (List_of item most) item) in Hv; [| reflexivity].
       apply Forall_app. split; [apply Forall_first; exact Hv | constructor; [exact Hw | apply Forall_skip; exact Hv]].
     + constructor. simpl. destruct most; [left; reflexivity |]. simpl in R. discriminate.
-  - destruct container as [| | | item most | item length]; inversion Sg; subst.
+  - destruct container as [| | | | item most | item length]; inversion Sg; subst.
     inversion H as [| ? v ? ? Hv H']; subst; inversion H' as [| ? w ? ? Hw H'']; subst; inversion H''; subst.
-    destruct v as [| | | items]; try (simpl in Hv; discriminate). destruct w as [k | | | ]; wrong Hw. simpl.
+    destruct v as [| | | | items]; [wrong Hv | wrong Hv | wrong Hv | wrong Hv |]. destruct w as [k | | | | ]; wrong Hw. simpl.
     apply safe_item_at. intros n _. constructor. exists (List_of item most). split; [reflexivity |].
     apply (list_typed (List_of item most) item); [reflexivity |]. apply Forall_remove.
     apply (list_typed (List_of item most) item); [reflexivity | exact Hv].
   - destruct (item_of container) as [item |] eqn:I; inversion Sg; subst.
     inversion H as [| ? v ? ? Hv H']; subst; inversion H' as [| ? w ? ? Hw H'']; subst;
       inversion H'' as [| ? z ? ? Hz H''']; subst; inversion H'''; subst.
-    destruct v as [n | b | t | items]; [destruct container; wrong Hv | destruct container; wrong Hv
-                                      | destruct container; wrong Hv |].
-    destruct w as [k | | | ]; wrong Hw. simpl.
+    destruct v as [n | b | t | g | items]; try (destruct container; wrong Hv; fail).
+    destruct w as [k | | | | ]; wrong Hw. simpl.
     apply safe_item_at. intros n _. constructor. exists container. split; [reflexivity |].
     apply (list_typed container item); [exact I |]. apply Forall_replace; [| exact Hz].
     apply (list_typed container item); [exact I | exact Hv].
@@ -453,15 +496,17 @@ Ltac use_type H := apply is_type_some in H.
 Lemma expression_step : forall f, all_safe f -> expression_safe (S f).
 Proof.
   intros f (E & A & C & _). intros up ctx e t env where_ T M.
-  destruct e as [n | b | s | name | operand at_ | operand | operator l r at_ | way l r at_ | operator compared l r
-                 | l r | l r | parts | from operand | container items | container value | from_one container index at_
+  destruct e as [n | fl | b | s | name | operand at_ | operand | operator l r at_ | way l r at_ | operator l r at_
+                 | operand | operand | way operand at_ | places operand | operator compared l r
+                 | l r | l r | parts | from operand at_ | container items | container value | from_one container index at_
                  | container | c | c fallback]; simpl in T |- *.
   - inversion T; subst; constructor; reflexivity.
+  - destruct (is_finite fl) eqn:F; inversion T; subst. constructor. split; [reflexivity | exact F].
   - inversion T; subst; constructor; reflexivity.
   - inversion T; subst; constructor; reflexivity.
   - destruct (lookup_matches _ _ _ _ M T) as [v [L H]]. rewrite L. constructor; exact H.
   - destruct (is_type _ Whole) eqn:O; inversion T; subst. use_type O.
-    eapply safe_bind; [eapply E; eauto |]. intros [n | b | s | k] H; wrong H. apply safe_checked_whole.
+    eapply safe_bind; [eapply E; eauto |]. intros [n | b | s | g | k] H; wrong H. apply safe_checked_whole.
   - destruct (is_type _ Bool) eqn:O; inversion T; subst. use_type O.
     eapply safe_bind; [eapply E; eauto |]. intros v H.
     apply safe_need_bool; [exact H | constructor; reflexivity | constructor; reflexivity].
@@ -469,11 +514,32 @@ Proof.
     apply andb_true_iff in O; destruct O as [Ol Or]. use_type Ol. use_type Or.
     eapply safe_bind; [eapply E; eauto |]. intros a Ha.
     eapply safe_bind; [eapply E; eauto |]. intros b Hb.
-    destruct a as [x | | | ]; wrong Ha. destruct b as [y | | | ]; wrong Hb. apply safe_checked_whole.
+    destruct a as [x | | | | ]; wrong Ha. destruct b as [y | | | | ]; wrong Hb. apply safe_checked_whole.
   - destruct (is_type _ Whole && is_type _ Whole) eqn:O; inversion T; subst.
     apply andb_true_iff in O; destruct O as [Ol Or]. use_type Ol. use_type Or.
     eapply safe_bind; [eapply E; eauto |]. intros a Ha.
     eapply safe_bind; [eapply E; eauto |]. intros b Hb. apply safe_divide; assumption.
+  - destruct (is_type _ Float && is_type _ Float) eqn:O; inversion T; subst.
+    apply andb_true_iff in O; destruct O as [Ol Or]. use_type Ol. use_type Or.
+    eapply safe_bind; [eapply E; eauto |]. intros a Ha.
+    eapply safe_bind; [eapply E; eauto |]. intros b Hb.
+    destruct a as [| | | x |]; wrong Ha. destruct b as [| | | y |]; wrong Hb.
+    apply safe_checked_float. intros z Ez. eapply float_arithmetic_fits; exact Ez.
+  - destruct (is_type _ Float) eqn:O; inversion T; subst. use_type O.
+    eapply safe_bind; [eapply E; eauto |]. intros v H.
+    destruct v as [| | | x |]; wrong H. destruct H as [_ Fx]. constructor. simpl.
+    split; [reflexivity |]. unfold float_negate. rewrite is_finite_Bopp. exact Fx.
+  - destruct (is_type _ Whole) eqn:O; inversion T; subst. use_type O.
+    eapply safe_bind; [eapply E; eauto |]. intros v H.
+    destruct v as [k | | | |]; wrong H. destruct (is_finite (float_of_whole k)) eqn:F.
+    + constructor. simpl. split; [reflexivity | exact F].
+    + fine.
+  - destruct (is_type _ Float) eqn:O; inversion T; subst. use_type O.
+    eapply safe_bind; [eapply E; eauto |]. intros v H.
+    destruct v as [| | | x |]; wrong H. destruct (float_to_whole way x); [constructor; reflexivity | fine].
+  - destruct (is_type _ Float) eqn:O; inversion T; subst. use_type O.
+    eapply safe_bind; [eapply E; eauto |]. intros v H.
+    destruct v as [| | | x |]; wrong H. constructor; reflexivity.
   - destruct (comparable operator compared && is_type _ compared && is_type _ compared) eqn:O; inversion T; subst.
     apply andb_true_iff in O; destruct O as [O Or]. apply andb_true_iff in O; destruct O as [Oc Ol].
     use_type Ol. use_type Or.
@@ -505,7 +571,7 @@ Proof.
     + eapply A; [apply (pairwise_repeat (fun e t => is_type (type_of procedures up ctx e) t)); exact O | exact M].
     + intros values H. constructor. apply (list_typed _ item); [exact I |].
       eapply typed_items; [exact H | apply repeat_same].
-  - destruct container as [| | | item most | item length]; try discriminate.
+  - destruct container as [| | | | item most | item length]; try discriminate.
     destruct (is_type _ item) eqn:O; inversion T; subst. use_type O.
     eapply safe_bind; [eapply E; eauto |]. intros v H. constructor.
     apply (list_typed _ item); [reflexivity |]. apply Forall_repeat; exact H.
@@ -513,10 +579,8 @@ Proof.
     destruct (is_type _ Whole) eqn:O; [| discriminate]. use_type O.
     eapply safe_bind; [eapply E; eauto |]. intros cv Hc.
     eapply safe_bind; [eapply E; eauto |]. intros iv Hi.
-    destruct iv as [k | | | ]; wrong Hi.
-    destruct cv as [n | b | s | items];
-      [destruct ct; wrong Hc; discriminate | destruct ct; wrong Hc; discriminate
-      | destruct ct; wrong Hc; discriminate |].
+    destruct iv as [k | | | | ]; wrong Hi.
+    destruct cv as [n | b | s | g | items]; try (destruct ct; wrong Hc; discriminate).
     apply (list_typed ct t items) in Hc; [| exact T].
     apply safe_item_at. intros n L.
     destruct (nth_error items n) as [v |] eqn:N.
@@ -525,9 +589,7 @@ Proof.
   - destruct (type_of procedures up ctx container) as [ct |] eqn:Tc; [| discriminate].
     destruct (item_of ct) as [item |] eqn:I; inversion T; subst.
     eapply safe_bind; [eapply E; eauto |]. intros cv Hc.
-    destruct cv as [n | b | s | items];
-      [destruct ct; wrong Hc; discriminate | destruct ct; wrong Hc; discriminate
-      | destruct ct; wrong Hc; discriminate |].
+    destruct cv as [n | b | s | g | items]; try (destruct ct; wrong Hc; discriminate).
     constructor; reflexivity.
   - destruct (call_type procedures up ctx c) as [[[u |] [| g gs]] |] eqn:O; inversion T; subst.
     eapply safe_bind; [eapply C; eauto |].
@@ -663,9 +725,7 @@ Proof.
     destruct (item_of st) as [item_type |] eqn:I; [| discriminate].
     destruct (block_ok _ _ _ body) eqn:Ob; inversion T; subst.
     eapply safe_bind; [eapply E; eauto |]. intros v Hv.
-    destruct v as [n | b | s | items];
-      [destruct st; wrong Hv; discriminate | destruct st; wrong Hv; discriminate
-      | destruct st; wrong Hv; discriminate |].
+    destruct v as [n | b | s | g | items]; try (destruct st; wrong Hv; discriminate).
     apply (list_typed st item_type items) in Hv; [| exact I].
     eapply G; eauto.
   - destruct (is_type _ Whole && is_type _ Whole && is_type _ Whole && block_ok _ _ _ body) eqn:O;
@@ -675,7 +735,7 @@ Proof.
     eapply safe_bind; [eapply E; eauto |]. intros x Hx.
     eapply safe_bind; [eapply E; eauto |]. intros y Hy.
     eapply safe_bind; [eapply E; eauto |]. intros z Hz.
-    destruct x as [p | | | ]; wrong Hx. destruct y as [q | | | ]; wrong Hy. destruct z as [r | | | ]; wrong Hz.
+    destruct x as [p | | | | ]; wrong Hx. destruct y as [q | | | | ]; wrong Hy. destruct z as [r | | | | ]; wrong Hz.
     destruct (never_ends p q r); [fine |]. eapply K; eauto.
   - destruct (inside_loop a) eqn:L; inversion T; subst.
     constructor. simpl. split; [exact L | apply matches_extends; exact M].

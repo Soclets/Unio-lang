@@ -68,7 +68,7 @@ Each checkpoint ends with something running, committed and pushed.
 4. [ ] **Failures in full:** done with checkpoint 3: `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash`
    (D152, status 5), `otherwise` with `case` and `instead`, D186. Left: handler families, `include`, handler parameters, `.*`; procedure
    families (`fam.proc`, D41); comments (`//`, `///`, `comment` blocks, D74).
-5. [ ] **Floats:** `Float`, literals with `~` (D155, D180), `+ - * /` and `sqrt` with D177's check, comparisons and
+5. [x] **Floats** (all but the proof of D178's roundings, still to do): `Float`, literals with `~` (D155, D180), `+ - * /` and `sqrt` with D177's check, comparisons and
    D184, `be.Float`, `be.Whole.floor`/`.trunc`/`.ceil`/`.nearest`/`.nearest.even` (D178), `be.Text` of a `Float`
    (D155, D181 to D183), `places:` (D175, D176). Proved with Flocq: each operation gives the nearest `Float`, ties to
    even, or stops; each rounding to `Whole` gives D178's number or stops.
@@ -93,6 +93,13 @@ Each checkpoint ends with something running, committed and pushed.
 - D8's missing `:` refusal: gone; an opening line ending in `:` is refused instead (D199).
 
 ## Status
+
+2026-11-24, 10:35: floats are built, and all 53 tests pass. Proven: `float_arithmetic_correct` and `float_sqrt_correct`
+(Flocq), with type safety now covering floats too. The theorems about floats rest on Flocq's four axioms, listed with
+their reasons in `assumptions/axioms.txt`, which the test runner checks `Print Assumptions` against. `type_safety`
+shows them too, only because Flocq's float values carry proofs that use them; extraction erases those.
+Reading and showing decimals (`float_of_decimal`, `text_of_float`, `text_with_places` in core/Float.v) are in Rocq but
+not proven yet: they're tested against Python (see the float tests' `check.py` and `tests/` in oracle).
 
 2026-11-24, later: checkpoint 3 and most of 4 are done: lists, arrays, `range`, `for each`, dividing, and failures
 (`! [ … ]`, `?`, `??`, `otherwise`, `instead`). Proven: `whole_division_exact`, and type safety for all of it, a failure

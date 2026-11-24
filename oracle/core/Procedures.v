@@ -4,16 +4,23 @@
    Any other word names one of the program's own procedures. *)
 
 From Stdlib Require Import String List Bool.
-From Ralph Require Import Syntax Diagnostics TypedTree.
+From Ralph Require Import Syntax Diagnostics TypedTree Float.
 Import ListNotations.
 Open Scope string_scope.
 
 (* `be.Text` is a target of its own, since it takes a `Whole` or a `Bool` (D22, D153). *)
-Inductive target := Library (which : library) | Convert_to_text | User (procedure : definition).
+Inductive target :=
+| Library (which : library)
+| Convert_to_text
+(* trace: D162 *)
+| Convert_to_float
+(* trace: D178: `be.Whole.floor` and the rest *)
+| Round_to_whole (way : to_whole)
+| User (procedure : definition).
 
 Inductive resolution := Resolved (to : target) | Unresolved (problems : list diagnostic).
 
-Definition library_words : list string := ["show_msg"; "be"; "ask"; "random"].
+Definition library_words : list string := ["show_msg"; "be"; "ask"; "random"; "sqrt"].
 
 Definition is_library_word (word : string) : bool := existsb (String.eqb word) library_words.
 
@@ -69,7 +76,7 @@ Definition resolve_show (c : callee) : resolution :=
       end
   end.
 
-(* trace: D22, D87, D102, D103 *)
+(* trace: D22, D87, D102, D103, D162, D178 *)
 Definition resolve_be (c : callee) : resolution :=
   match callee_narrowings c with
   | [] => Unresolved [Refused (Be_without_type (callee_word_at c))]
@@ -79,10 +86,32 @@ Definition resolve_be (c : callee) : resolution :=
         | [] => Resolved Convert_to_text
         | (n, at_) :: _ => Unresolved [Refused (Narrowing_on_narrowed "be.Text" n at_)]
         end
+      else if String.eqb type_name "Float" then
+        match rest with
+        | [] => Resolved Convert_to_float
+        | (n, at_) :: _ => Unresolved [Refused (Narrowing_on_narrowed "be.Float" n at_)]
+        end
       else if String.eqb type_name "Whole" then
         match rest with
         | [] => Resolved (Library Convert_to_whole)
-        | (n, at_) :: _ => Unresolved [Refused (Narrowing_on_narrowed "be.Whole" n at_)]
+        | (n, at_) :: further =>
+            let plain_way (way : to_whole) :=
+              match further with
+              | [] => Resolved (Round_to_whole way)
+              | (m, at') :: _ => Unresolved [Refused (Narrowing_on_narrowed ("be.Whole." ++ n) m at')]
+              end in
+            if String.eqb n "floor" then plain_way Whole_floor
+            else if String.eqb n "trunc" then plain_way Whole_trunc
+            else if String.eqb n "ceil" then plain_way Whole_ceil
+            else if String.eqb n "nearest" then
+              match further with
+              | [] => Resolved (Round_to_whole Whole_nearest)
+              | [(m, at')] =>
+                  if String.eqb m "even" then Resolved (Round_to_whole Whole_nearest_even)
+                  else Unresolved [Refused (Unknown_narrowing "be.Whole.nearest" m at' ["even"])]
+              | _ :: (m, at') :: _ => Unresolved [Refused (Narrowing_on_narrowed "be.Whole.nearest.even" m at')]
+              end
+            else Unresolved [Refused (Unknown_narrowing "be.Whole" n at_ ["floor"; "trunc"; "ceil"; "nearest"])]
         end
       else Unresolved [Not_designed_yet Converting type_at]
   end.
@@ -93,6 +122,8 @@ Definition resolve (p : program) (c : callee) : resolution :=
   else if String.eqb word "be" then resolve_be c
   else if String.eqb word "ask" then plain c (Library Ask_for_line)
   else if String.eqb word "random" then plain c (Library Random_number)
+  (* trace: D185 *)
+  else if String.eqb word "sqrt" then plain c (Library Square_root)
   else
     match find_definition p word with
     | Some d => plain c (User d)
@@ -128,7 +159,7 @@ Definition user_parameters (d : definition) : list (type * option string) :=
 (* The place an expression covers. *)
 Definition expression_at (e : expression) : place :=
   match e with
-  | Whole_literal _ at_ | Text_literal _ at_ | Bool_literal _ at_ | Variable_value _ at_
+  | Whole_literal _ at_ | Float_literal _ _ _ at_ | Text_literal _ at_ | Bool_literal _ at_ | Variable_value _ at_
   | Bare_word _ at_ | Negate _ at_ | Not _ at_ | Binary _ _ _ _ at_ | Division _ _ _ _ _ at_ | List_literal _ at_
   | All_literal _ at_ | Item _ _ _ _ at_ | Fact _ _ _ at_ | Method _ _ _ _ at_ | Range _ at_ | Pass_up _ _ at_
   | Ignore_failure _ _ at_ | Crash_on_failure _ _ at_ | Bracketed _ at_ | Call _ _ at_

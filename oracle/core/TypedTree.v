@@ -12,7 +12,8 @@
    of its messages. *)
 
 From Stdlib Require Import String List Bool ZArith.
-From Ralph Require Import Whole Syntax.
+From Flocq Require Import IEEE754.BinarySingleNaN.
+From Ralph Require Import Whole Syntax Float.
 Import ListNotations.
 Open Scope list_scope.
 Set Warnings "-register-all".
@@ -27,6 +28,8 @@ Inductive library :=
 | Ask_for_line
 (* trace: D26 *)
 | Random_number
+(* trace: D185 *)
+| Square_root
 (* trace: D22, D95, D156 *)
 | Convert_to_whole
 (* trace: D80, D168: `.add(item)` on a list *)
@@ -48,6 +51,7 @@ Definition library_signature (which : library) : option (list type * option type
   | Show_message _ => Some ([Text], None, [])
   | Ask_for_line => Some ([Text], Some Text, [])
   | Random_number => Some ([Whole; Whole], Some Whole, [])
+  | Square_root => Some ([Float], Some Float, [])
   | Convert_to_whole => Some ([Text], Some Whole, ["not_a_whole"%string])
   | Add_item (List_of item most as t) => Some ([t; item], Some t, full_if most)
   | Insert_item (List_of item most as t) _ => Some ([t; item; Whole], Some t, full_if most)
@@ -64,6 +68,8 @@ Module Typed.
 
 Inductive expression :=
 | Whole_literal (n : Z)
+(* trace: D155, D157 *)
+| Float_literal (f : float)
 | Bool_literal (b : bool)
 | Text_literal (t : string)
 | Read (name : string)
@@ -73,6 +79,15 @@ Inductive expression :=
 | Maths (operator : arithmetic) (left_operand right_operand : expression) (at_ : place)
 (* trace: D70, D71, D72 *)
 | Divide (way : division) (left_operand right_operand : expression) (at_ : place)
+(* trace: D177, D179: `+`, `-`, `*` and `/` on two `Float`s *)
+| Float_maths (operator : float_operation) (left_operand right_operand : expression) (at_ : place)
+| Float_negate (operand : expression)
+(* trace: D162: `be.Float` *)
+| Float_of (operand : expression)
+(* trace: D178: `be.Whole.floor` and the rest, with the place for the check that it fits *)
+| Whole_of_float (way : to_whole) (operand : expression) (at_ : place)
+(* trace: D175: a `Float` in braces with `places:` *)
+| Text_places (places : Z) (operand : expression)
 (* A comparison between two values of the type [compared] (D17, D190). *)
 | Compare (operator : binary_operator) (compared : type) (left_operand right_operand : expression)
 (* `and` and `or`, which stop early (D34). *)
@@ -80,8 +95,9 @@ Inductive expression :=
 | Logic_or (left_operand right_operand : expression)
 (* Text filled in from its pieces, each a `Text` (D29, D200). *)
 | Join (parts : list expression)
-(* A `Whole` or a `Bool` as text, as `be.Text` and braces give it (D22, D153, D202). *)
-| Text_of (from : type) (operand : expression)
+(* A `Whole`, a `Bool` or a `Float` as text, as `be.Text` and braces give it (D22, D153, D155, D202), with its place
+   for what isn't decided about showing a `Float`. *)
+| Text_of (from : type) (operand : expression) (at_ : place)
 (* A list or an array written out, of the type [container] (D75, D76, D167). *)
 | List_literal (container : type) (items : list expression)
 (* `[all: value]`: an array whose every item is [value] (D169). *)
@@ -173,12 +189,12 @@ Definition is_type (found : option type) (expected : type) : bool :=
 
 Definition comparable (operator : binary_operator) (t : type) : bool :=
   match operator, t with
-  | (Equal | Not_equal), (Whole | Bool) => true
-  | (Less | Greater | At_least | At_most), Whole => true
+  | (Equal | Not_equal), (Whole | Bool | Float) => true
+  | (Less | Greater | At_least | At_most), (Whole | Float) => true
   | _, _ => false
   end.
 
-Definition shown (t : type) : bool := match t with Whole | Bool => true | _ => false end.
+Definition shown (t : type) : bool := match t with Whole | Bool | Float => true | _ => false end.
 
 Definition within (failures up : list string) : bool :=
   forallb (fun f => existsb (String.eqb f) up) failures.
@@ -196,6 +212,7 @@ Fixpoint type_of (procedures : list procedure) (up : list string) (ctx : context
   : option type :=
   match e with
   | Whole_literal _ => Some Whole
+  | Float_literal f => if is_finite f then Some Float else None
   | Bool_literal _ => Some Bool
   | Text_literal _ => Some Text
   | Read name => find_type name ctx
@@ -204,6 +221,13 @@ Fixpoint type_of (procedures : list procedure) (up : list string) (ctx : context
   | Maths _ l r _ | Divide _ l r _ =>
       if is_type (type_of procedures up ctx l) Whole && is_type (type_of procedures up ctx r) Whole
       then Some Whole else None
+  | Float_maths _ l r _ =>
+      if is_type (type_of procedures up ctx l) Float && is_type (type_of procedures up ctx r) Float
+      then Some Float else None
+  | Float_negate operand => if is_type (type_of procedures up ctx operand) Float then Some Float else None
+  | Float_of operand => if is_type (type_of procedures up ctx operand) Whole then Some Float else None
+  | Whole_of_float _ operand _ => if is_type (type_of procedures up ctx operand) Float then Some Whole else None
+  | Text_places _ operand => if is_type (type_of procedures up ctx operand) Float then Some Text else None
   | Compare operator compared l r =>
       if comparable operator compared && is_type (type_of procedures up ctx l) compared
          && is_type (type_of procedures up ctx r) compared
@@ -213,7 +237,7 @@ Fixpoint type_of (procedures : list procedure) (up : list string) (ctx : context
       then Some Bool else None
   | Join parts =>
       if forallb (fun part => is_type (type_of procedures up ctx part) Text) parts then Some Text else None
-  | Text_of from operand =>
+  | Text_of from operand _ =>
       if shown from && is_type (type_of procedures up ctx operand) from then Some Text else None
   | List_literal container items =>
       match item_of container with

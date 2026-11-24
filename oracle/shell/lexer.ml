@@ -8,6 +8,7 @@ type kind =
   | Dollar of string
       (** a name written after a `$`, which names no longer have (D192), so it can be refused *)
   | Number of string  (** a whole number's digits (D15) *)
+  | Decimal of string * string  (** a number with a point: the digits before it and after it (D155, D180) *)
   | Text of string
       (** text in double quotes, as written between them, with its `\` escapes (D21, D30) *)
   | Unclosed_text of string  (** text whose closing double quote never comes on its line *)
@@ -61,6 +62,7 @@ let symbols =
     "?";
     "{";
     "}";
+    "~";
   ]
 
 let starts_with text at prefix =
@@ -102,7 +104,12 @@ let lex_line number text =
       else if is_digit c then
         let rec stop i = if i < length && is_digit text.[i] then stop (i + 1) else i in
         let finish = stop at in
-        scan finish (token (Number (String.sub text at (finish - at))) at finish :: tokens)
+        if finish + 1 < length && text.[finish] = '.' && is_digit text.[finish + 1] then
+          let after = stop (finish + 1) in
+          scan after
+            (token (Decimal (String.sub text at (finish - at), String.sub text (finish + 1) (after - finish - 1))) at after
+            :: tokens)
+        else scan finish (token (Number (String.sub text at (finish - at))) at finish :: tokens)
       else if is_letter c || c = '_' then
         let rec stop i = if i < length && is_word_character text.[i] then stop (i + 1) else i in
         let finish = stop at in
@@ -145,6 +152,7 @@ let describe kind =
   | Word w -> w
   | Dollar name -> "$" ^ name
   | Number digits -> digits
+  | Decimal (before, after) -> before ^ "." ^ after
   | Text inside -> "\"" ^ inside ^ "\""
   | Unclosed_text inside -> "\"" ^ inside
   | Single_quoted inside -> "'" ^ inside ^ "'"

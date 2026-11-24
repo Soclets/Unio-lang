@@ -141,19 +141,32 @@ let check_test ralph folder =
   in
   Ok (match problems @ python_problems with [] -> Pass | problems -> Fail problems)
 
-(* Every line of the captured `Print Assumptions` output must say the theorem rests on nothing. Ralph has no axioms
-   yet; when one is added, it goes in a list here, with its reason in extraction/Trusted.v. *)
-let check_assumptions path =
-  match read_file path with
-  | Error message -> Fail [ message ]
-  | Ok text ->
-      let lines =
-        List.filter (fun line -> String.trim line <> "") (String.split_on_char '\n' text)
+(* trace: D189. Every theorem in the captured `Print Assumptions` output rests on nothing, or only on the axioms listed
+   in assumptions/axioms.txt, each with its reason there (Building rule 14). *)
+let check_assumptions path believed_path =
+  match (read_file path, read_file believed_path) with
+  | Error message, _ | _, Error message -> Fail [ message ]
+  | Ok text, Ok believed_text ->
+      let believed =
+        List.filter
+          (fun line -> line <> "" && line.[0] <> '#')
+          (List.map String.trim (String.split_on_char '\n' believed_text))
       in
-      let unexpected = List.filter (fun line -> line <> "Closed under the global context") lines in
+      let lines = List.filter (fun line -> String.trim line <> "") (String.split_on_char '\n' text) in
+      let unexpected =
+        List.filter
+          (fun line ->
+            if line = "Closed under the global context" || line = "Axioms:" then false
+            else if line.[0] = ' ' then false
+            else
+              match String.index_opt line ' ' with
+              | Some i -> not (List.mem (String.sub line 0 i) believed)
+              | None -> true)
+          lines
+      in
       if lines = [] then Fail [ "no theorems were checked" ]
       else if unexpected = [] then Pass
-      else Fail unexpected
+      else Fail (List.map (fun line -> "not on the list of believed axioms: " ^ line) unexpected)
 
 let json_string text =
   let buffer = Buffer.create (String.length text + 2) in
@@ -179,7 +192,7 @@ let json_of_verdict = function
 
 let () =
   match Sys.argv with
-  | [| _; ralph; assumptions |] -> (
+  | [| _; ralph; assumptions; believed |] -> (
       let source_root =
         match Sys.getenv_opt "DUNE_SOURCEROOT" with Some root -> root | None -> Sys.getcwd ()
       in
@@ -209,7 +222,7 @@ let () =
                 (name, verdict))
               names
           in
-          let assumptions_verdict = check_assumptions assumptions in
+          let assumptions_verdict = check_assumptions assumptions believed in
           let passed = List.length (List.filter (fun (_, verdict) -> verdict = Pass) results) in
           let failed = List.length results - passed in
           List.iter

@@ -3,9 +3,10 @@
 
 (rule
  (alias check)
- (deps (universe) shell/ralph.exe assumptions/assumptions.txt)
+ (deps (universe) shell/ralph.exe assumptions/assumptions.txt assumptions/axioms.txt)
  (action
   (run
    %{exe:tests/run_tests.exe}
    %{dep:shell/ralph.exe}
-   %{dep:assumptions/assumptions.txt})))
+   %{dep:assumptions/assumptions.txt}
+   %{dep:assumptions/axioms.txt})))

@@ -10,6 +10,7 @@ let rec type_name = function
   | Core.Whole -> "Whole"
   | Core.Bool -> "Bool"
   | Core.Text -> "Text"
+  | Core.Float -> "Float"
   | Core.List_of (item, None) -> "List<" ^ type_name item ^ ">"
   | Core.List_of (item, Some most) ->
       "List<" ^ type_name item ^ ">[len.max: " ^ Core.text_of_whole most ^ "]"
@@ -382,6 +383,48 @@ let refusal source (r : Core.refusal) : M.message =
         ~why:
           "`instead` gives the value to carry on with when a call fails; after one that gives \
            nothing, a case just ends."
+  (* trace: D155. The fix adds the `~`; its `why:` is a draft. *)
+  | Core.Approximate_literal p ->
+      let w = Option.value (written source p) ~default:"" in
+      refused p
+        ~fix:(M.insert_at (line_of source p) p.place_column "~")
+        ~why:
+          (Printf.sprintf "%s can't be stored exactly in a `Float`, so it's written %s, to show it's approximate."
+             (quoted w) (quoted ("~" ^ w)))
+  | Core.Exact_literal_marked p ->
+      let w = Option.value (written source p) ~default:"~" in
+      refused p
+        ~fix:(M.replace_at (line_of source p) p.place_column 1 "")
+        ~why:(Printf.sprintf "%s is stored exactly, so it takes no `~`." (quoted (String.sub w 1 (String.length w - 1))))
+  (* trace: D180. The fix gives or takes away the point; the `why:` is a draft. *)
+  | Core.Literal_point (to_float, p) ->
+      let w = Option.value (written source p) ~default:"" in
+      let fixed =
+        if to_float then w ^ ".0" else match String.index_opt w '.' with Some i -> String.sub w 0 i | None -> w
+      in
+      refused p
+        ~fix:(M.replace_at (line_of source p) p.place_column p.place_width fixed)
+        ~why:"a number written with a point is a `Float`, and one without is a `Whole`."
+  (* trace: D162. A draft wording. *)
+  | Core.Mixed_numbers (_, whole_at, _) ->
+      let w = Option.value (written source whole_at) ~default:"" in
+      refused whole_at
+        ~fix:(M.replace_at (line_of source whole_at) whole_at.place_column whole_at.place_width ("be.Float(" ^ w ^ ")"))
+        ~why:"a `Whole` and a `Float` don't mix in one calculation; `be.Float` makes the `Whole` a `Float`."
+  (* trace: D178. A draft wording. *)
+  | Core.Bare_whole_of_float p ->
+      refused p
+        ~what:
+          "`be.Whole` on a `Float` says how the fraction goes: `.floor`, `.trunc`, `.ceil`, `.nearest` or \
+           `.nearest.even`"
+        ~why:"each gives a different whole number for a `Float` with a fraction, so the program says which."
+  (* trace: D184. A draft wording. *)
+  | Core.Float_equality_in_while (operator, p) ->
+      refused p
+        ~what:(Printf.sprintf "this `while` condition compares two `Float`s with %s" (quoted (operator_name operator)))
+        ~why:
+          "a `Float` that changes each pass rarely lands exactly on a value, so the loop could pass it and never stop; \
+           `<`, `>`, `at_least` or `at_most` say \"until it reaches\"."
   (* trace: D70, D71, D89 *)
   | Core.Division_types (word, left, right, p) ->
       refused p
@@ -545,6 +588,10 @@ let refusal source (r : Core.refusal) : M.message =
           refused p
             ~fix:(M.insert_at (line_of source p) (p.place_column + p.place_width) " not_eq 0")
             ~why
+      | Core.Float, Some _ ->
+          refused p
+            ~fix:(M.insert_at (line_of source p) (p.place_column + p.place_width) " not_eq 0.0")
+            ~why
       | _ ->
           refused p
             ~what:
@@ -686,6 +733,7 @@ let not_designed (what : Core.not_designed) =
   | Core.After_instead -> "a line after `instead` in the same block"
   | Core.Going_through_text -> "going through text with `for each`"
   | Core.Comparing_lists -> "comparing lists or arrays"
+  | Core.Float_literal_out_of_range -> "writing a number too big for a `Float`"
 
 (* Every core diagnostic as a message; [None] for a part the parser has already refused. *)
 let diagnostic source (d : Core.diagnostic) : M.message option =

@@ -10,7 +10,7 @@
    program runs only when there are no refusals at all, and the second type checker agrees (see [check_program]). *)
 
 From Stdlib Require Import String List Bool ZArith.
-From Ralph Require Import Whole Syntax Diagnostics TypedTree Procedures.
+From Ralph Require Import Whole Float Syntax Diagnostics TypedTree Procedures.
 Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
@@ -124,6 +124,22 @@ Definition arithmetic_of (operator : binary_operator) : arithmetic :=
 
 Definition is_list (t : type) : bool := match item_of t with Some _ => true | None => false end.
 
+(* trace: D162, D180. A `Whole` beside a `Float`: a plain number gets its point, anything else `be.Float`. *)
+Definition mixing (operator : binary_operator) (whole_side : expression) (operator_at : place) : diagnostic :=
+  match whole_side with
+  | Whole_literal _ at_ => Refused (Literal_point true at_)
+  | _ =>
+      Refused (Mixed_numbers (match operator with Subtract => "-" | Multiply => "*" | _ => "+" end)
+                 (expression_at whole_side) operator_at)
+  end.
+
+Definition comparing_numbers (operator : binary_operator) (a b : type) (whole_side : expression) (operator_at : place)
+  : diagnostic :=
+  match whole_side with
+  | Whole_literal _ at_ => Refused (Literal_point true at_)
+  | _ => Refused (Compare_types operator a b operator_at)
+  end.
+
 (* The type of an operator's result from its sides' types, its tree, or why it's refused. *)
 Definition binary_type (operator : binary_operator) (a b : type) (left_operand right_operand : expression)
     (left_tree right_tree : Typed.expression) (operator_at at_ : place)
@@ -132,6 +148,14 @@ Definition binary_type (operator : binary_operator) (a b : type) (left_operand r
   | Add | Subtract | Multiply =>
       match a, b with
       | Whole, Whole => (Some Whole, Typed.Maths (arithmetic_of operator) left_tree right_tree at_, [])
+      (* trace: D177 *)
+      | Float, Float =>
+          (Some Float,
+           Typed.Float_maths (match operator with Subtract => Float_minus | Multiply => Float_times | _ => Float_plus end)
+             left_tree right_tree at_, [])
+      (* trace: D162, D180 *)
+      | Whole, Float => (None, stand_in, [mixing operator left_operand operator_at])
+      | Float, Whole => (None, stand_in, [mixing operator right_operand operator_at])
       | Text, Text =>
           match operator with
           (* trace: D28, D201 *)
@@ -142,7 +166,9 @@ Definition binary_type (operator : binary_operator) (a b : type) (left_operand r
       end
   | Equal | Not_equal =>
       match a, b with
-      | Whole, Whole | Bool, Bool => (Some Bool, Typed.Compare operator a left_tree right_tree, [])
+      | Whole, Whole | Bool, Bool | Float, Float => (Some Bool, Typed.Compare operator a left_tree right_tree, [])
+      | Whole, Float => (None, stand_in, [comparing_numbers operator a b left_operand operator_at])
+      | Float, Whole => (None, stand_in, [comparing_numbers operator a b right_operand operator_at])
       | Text, Text => (None, stand_in, [Not_designed_yet Comparing_text operator_at])
       | _, _ =>
           if is_list a && is_list b then (None, stand_in, [Not_designed_yet Comparing_lists operator_at])
@@ -151,6 +177,10 @@ Definition binary_type (operator : binary_operator) (a b : type) (left_operand r
   | Less | Greater | At_least | At_most =>
       match a, b with
       | Whole, Whole => (Some Bool, Typed.Compare operator Whole left_tree right_tree, [])
+      (* trace: D184 *)
+      | Float, Float => (Some Bool, Typed.Compare operator Float left_tree right_tree, [])
+      | Whole, Float => (None, stand_in, [comparing_numbers operator a b left_operand operator_at])
+      | Float, Whole => (None, stand_in, [comparing_numbers operator a b right_operand operator_at])
       | Text, Text => (None, stand_in, [Not_designed_yet Comparing_text operator_at])
       | Bool, Bool => (None, stand_in, [Not_designed_yet Ordering_bools operator_at])
       | _, _ =>
@@ -219,16 +249,23 @@ Definition check_piece (s : setting) (p : piece) : Typed.expression * list diagn
       | Some info =>
           match variable_type info with
           | Text => (Typed.Read name, [])
-          | Whole => (Typed.Text_of Whole (Typed.Read name), [])
-          | Bool => (Typed.Text_of Bool (Typed.Read name), [])
+          | Whole => (Typed.Text_of Whole (Typed.Read name) at_, [])
+          | Bool => (Typed.Text_of Bool (Typed.Read name) at_, [])
+          (* trace: D155 *)
+          | Float => (Typed.Text_of Float (Typed.Read name) at_, [])
           | _ => (stand_in, [Not_designed_yet Converting at_])
           end
       | None => (stand_in, [Refused (Brace_not_variable name at_)])
       end
-  (* trace: D175. `places:` is for a `Float`, which isn't built yet. *)
-  | Piece_places name at_ _ _ =>
+  (* trace: D175 *)
+  | Piece_places name at_ places _ =>
       match find_variable name (setting_scope s) with
-      | Some info => (stand_in, [Refused (Places_on_non_float name (variable_type info) at_)])
+      | Some info =>
+          match variable_type info, whole_of_literal places with
+          | Float, Some n => (Typed.Text_places n (Typed.Read name), [])
+          | Float, None => (stand_in, [Already_refused at_])
+          | other, _ => (stand_in, [Refused (Places_on_non_float name other at_)])
+          end
       | None => (stand_in, [Refused (Brace_not_variable name at_)])
       end
   | Piece_other at_ => (stand_in, [Refused (Brace_calculation at_)])
@@ -351,8 +388,9 @@ Definition check_target (procedure : string) (target : target) (given : list che
   | Convert_to_text =>
       match check_single procedure given at_ with
       (* trace: D22, D153 *)
-      | (Some (Whole, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Whole tree))
-      | (Some (Bool, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Bool tree))
+      | (Some (Whole, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Whole tree at_))
+      | (Some (Bool, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Bool tree at_))
+      | (Some (Float, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Float tree at_))
       | (Some (Text, value_at, _), d) => unknown_call (d ++ [Refused (Convert_to_same Text value_at)])
       | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
       | (None, d) => unknown_call d
@@ -362,9 +400,30 @@ Definition check_target (procedure : string) (target : target) (given : list che
       | (Some (Text, _, tree), d) =>
           make_call (Gives_value Whole) ["not_a_whole"] d (library_call Convert_to_whole [tree] at_)
       | (Some (Whole, value_at, _), d) => unknown_call (d ++ [Refused (Convert_to_same Whole value_at)])
+      (* trace: D178 *)
+      | (Some (Float, _, _), d) => unknown_call (d ++ [Refused (Bare_whole_of_float at_)])
       | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
       | (None, d) => unknown_call d
       end
+  (* trace: D162 *)
+  | Convert_to_float =>
+      match check_single procedure given at_ with
+      | (Some (Whole, _, tree), d) => make_call (Gives_value Float) [] d (Pure (Typed.Float_of tree))
+      | (Some (Float, value_at, _), d) => unknown_call (d ++ [Refused (Convert_to_same Float value_at)])
+      | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
+      | (None, d) => unknown_call d
+      end
+  (* trace: D178 *)
+  | Round_to_whole way =>
+      match check_single procedure given at_ with
+      | (Some (Float, _, tree), d) => make_call (Gives_value Whole) [] d (Pure (Typed.Whole_of_float way tree at_))
+      | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
+      | (None, d) => unknown_call d
+      end
+  (* trace: D185 *)
+  | Library Square_root =>
+      make_call (Gives_value Float) [] (check_against procedure [(Float, None)] given at_ None)
+        (library_call Square_root (trees given) at_)
   | Library Ask_for_line =>
       make_call (Gives_value Text) [] (check_against procedure [(Text, None)] given at_ None)
         (library_call Ask_for_line (trees given) at_)
@@ -386,6 +445,7 @@ Definition expected_arguments (p : program) (name : callee) : list (option type)
   | Resolved (User d) => map (fun x => Some (fst x)) (user_parameters d)
   | Resolved (Library (Show_message _)) | Resolved (Library Ask_for_line) => [Some Text]
   | Resolved (Library Random_number) => [Some Whole; Some Whole]
+  | Resolved (Library Square_root) => [Some Float]
   | _ => []
   end.
 
@@ -426,13 +486,15 @@ Definition check_step_target (procedure : string) (target : target) (slid : opti
   | Convert_to_text =>
       match slid with
       | Some Text => unknown_call (values_diagnostics given ++ [Refused (Convert_to_same Text at_)])
-      | Some Bool => one_more [(Bool, None)] (Gives_value Text) [] (Pure (Typed.Text_of Bool slid_tree))
-      | Some Whole | None => one_more [(Whole, None)] (Gives_value Text) [] (Pure (Typed.Text_of Whole slid_tree))
+      | Some Bool => one_more [(Bool, None)] (Gives_value Text) [] (Pure (Typed.Text_of Bool slid_tree at_))
+      | Some Float => one_more [(Float, None)] (Gives_value Text) [] (Pure (Typed.Text_of Float slid_tree at_))
+      | Some Whole | None => one_more [(Whole, None)] (Gives_value Text) [] (Pure (Typed.Text_of Whole slid_tree at_))
       | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
       end
   | Library Convert_to_whole =>
       match slid with
       | Some Whole => unknown_call (values_diagnostics given ++ [Refused (Convert_to_same Whole at_)])
+      | Some Float => unknown_call (values_diagnostics given ++ [Refused (Bare_whole_of_float at_)])
       | Some Text | None =>
           one_more [(Text, None)] (Gives_value Whole) ["not_a_whole"] (library_call Convert_to_whole all_trees at_)
       | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
@@ -442,6 +504,19 @@ Definition check_step_target (procedure : string) (target : target) (slid : opti
   | Library Random_number =>
       one_more [(Whole, Some "from"); (Whole, Some "to")] (Gives_value Whole) []
         (library_call Random_number all_trees at_)
+  | Library Square_root => one_more [(Float, None)] (Gives_value Float) [] (library_call Square_root all_trees at_)
+  | Convert_to_float =>
+      match slid with
+      | Some Float => unknown_call (values_diagnostics given ++ [Refused (Convert_to_same Float at_)])
+      | Some Whole | None => one_more [(Whole, None)] (Gives_value Float) [] (Pure (Typed.Float_of slid_tree))
+      | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
+      end
+  | Round_to_whole way =>
+      match slid with
+      | Some Float | None =>
+          one_more [(Float, None)] (Gives_value Whole) [] (Pure (Typed.Whole_of_float way slid_tree at_))
+      | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
+      end
   | Library _ => unknown_call (values_diagnostics given)
   | User d =>
       one_more (user_parameters d) (gives_of d) (failures_of d)
@@ -501,12 +576,32 @@ Definition callee_of_attempt (e : expression) : string :=
 Fixpoint check_expression (s : setting) (expected : option type) (e : expression) {struct e}
   : option type * Typed.expression * list diagnostic :=
   match e with
+  (* trace: D180. A number without a point is a `Whole`; where a `Float` goes, it's refused with its point as the
+     fix. *)
   | Whole_literal digits at_ =>
-      match whole_of_literal digits with
-      | Some n =>
-          if (whole_minimum <=? n)%Z && (n <=? whole_maximum)%Z then (Some Whole, Typed.Whole_literal n, [])
-          else (None, stand_in, [Not_designed_yet Whole_literal_out_of_range at_])
-      | None => (None, stand_in, [Already_refused at_])
+      match expected with
+      | Some Float => (Some Float, stand_in, [Refused (Literal_point true at_)])
+      | _ =>
+          match whole_of_literal digits with
+          | Some n =>
+              if (whole_minimum <=? n)%Z && (n <=? whole_maximum)%Z then (Some Whole, Typed.Whole_literal n, [])
+              else (None, stand_in, [Not_designed_yet Whole_literal_out_of_range at_])
+          | None => (None, stand_in, [Already_refused at_])
+          end
+      end
+  (* trace: D155, D180 *)
+  | Float_literal before after approximate at_ =>
+      match float_of_decimal before after with
+      | Some (f, exact) =>
+          match expected, exact && negb approximate && match whole_of_literal after with Some Z0 => true | _ => false end with
+          | Some Whole, true => (Some Whole, stand_in, [Refused (Literal_point false at_)])
+          | _, _ =>
+              (Some Float, Typed.Float_literal f,
+               if exact && approximate then [Refused (Exact_literal_marked at_)]
+               else if negb exact && negb approximate then [Refused (Approximate_literal at_)]
+               else [])
+          end
+      | None => (None, stand_in, [Not_designed_yet Float_literal_out_of_range at_])
       end
   | Text_literal pieces _ => let (tree, ds) := check_text s pieces in (Some Text, tree, ds)
   | Bool_literal b _ => (Some Bool, Typed.Bool_literal b, [])
@@ -524,6 +619,7 @@ Fixpoint check_expression (s : setting) (expected : option type) (e : expression
       let '(t, tree, ds) := check_expression s None operand in
       match t with
       | Some Whole => (Some Whole, Typed.Negate tree at_, ds)
+      | Some Float => (Some Float, Typed.Float_negate tree, ds)
       | Some other => (None, stand_in, ds ++ [Refused (Negate_non_number other at_)])
       | None => (None, stand_in, ds)
       end
@@ -553,6 +649,22 @@ Fixpoint check_expression (s : setting) (expected : option type) (e : expression
       | Some w =>
           match a, b with
           | Some Whole, Some Whole => (Some Whole, Typed.Divide w left_tree right_tree at_, dl ++ dr)
+          (* trace: D179 *)
+          | Some Float, Some Float =>
+              match w with
+              | Divide_exactly => (Some Float, Typed.Float_maths Float_divide left_tree right_tree at_, dl ++ dr)
+              | _ => (None, stand_in, dl ++ dr ++ [Refused (Division_types word Float Float operator_at)])
+              end
+          | Some Whole, Some Float =>
+              (None, stand_in, dl ++ dr ++ [match left_operand with
+                                            | Whole_literal _ l_at => Refused (Literal_point true l_at)
+                                            | _ => Refused (Mixed_numbers word (expression_at left_operand) operator_at)
+                                            end])
+          | Some Float, Some Whole =>
+              (None, stand_in, dl ++ dr ++ [match right_operand with
+                                            | Whole_literal _ r_at => Refused (Literal_point true r_at)
+                                            | _ => Refused (Mixed_numbers word (expression_at right_operand) operator_at)
+                                            end])
           | Some a', Some b' => (None, stand_in, dl ++ dr ++ [Refused (Division_types word a' b' operator_at)])
           | _, _ => (None, stand_in, dl ++ dr)
           end
@@ -999,6 +1111,20 @@ Definition check_condition (s : setting) (condition : expression) : Typed.expres
   | Some other => (tree, ds ++ [Refused (Condition_not_bool other (expression_at condition))])
   end.
 
+(* trace: D184. `eq` and `not_eq` between two `Float`s anywhere in a `while` condition. *)
+Fixpoint float_equalities (s : setting) (condition : expression) : list diagnostic :=
+  match condition with
+  | Binary ((Equal | Not_equal) as operator) left_operand _ operator_at _ =>
+      let '(t, _, _) := check_expression s None left_operand in
+      match t with
+      | Some Float => [Refused (Float_equality_in_while operator operator_at)]
+      | _ => []
+      end
+  | Binary (And | Or) left_operand right_operand _ _ => float_equalities s left_operand ++ float_equalities s right_operand
+  | Not operand _ | Bracketed operand _ => float_equalities s operand
+  | _ => []
+  end.
+
 (* Whether a statement leaves the block it's in: by `return`, or by `break` when it isn't inside a loop of its own
    ([in_inner_loop]). *)
 Fixpoint can_leave (in_inner_loop : bool) (st : statement) : bool :=
@@ -1190,6 +1316,7 @@ Fixpoint check_statement (s : setting) (st : statement) {struct st} : setting * 
        dc ++ dt ++ de)
   | While condition body _ =>
       let (condition_tree, dc) := check_condition s condition in
+      let dc := dc ++ float_equalities s condition in
       let '(ended_body, body_tree, db) := check_block (in_loop s) body in
       (with_ended s (ended_body ++ setting_ended s), Typed.While condition_tree body_tree, dc ++ db)
   | Break at_ => (s, Typed.Break, if setting_in_loop s then [] else [Refused (Break_outside_loop at_)])

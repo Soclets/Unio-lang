@@ -1,0 +1,14 @@
+# The axioms Ralph's theorems may rest on (Building rule 14, D189): the four Flocq's proofs about real numbers use.
+# `Print Assumptions` for every main theorem may show these and nothing else; the test runner checks it.
+# None of them is used by what Ralph runs: they appear only inside proofs, which extraction erases.
+# Each is independent of Rocq's own logic, so Rocq can neither prove nor disprove it, and Rocq with all four is known
+# to be consistent if ordinary set theory (ZFC) is.
+
+# Excluded middle: every statement is true or false. Ordinary mathematics assumes it everywhere.
+Classical_Prop.classic
+# Two functions that give the same output for every input are equal. True of functions in ordinary mathematics.
+FunctionalExtensionality.functional_extensionality_dep
+# From Rocq's real numbers: a statement about reals is either refutable or not, and a property of the natural
+# numbers either holds for all of them or fails for one, which lets reals be compared as school maths does.
+ClassicalDedekindReals.sig_not_dec
+ClassicalDedekindReals.sig_forall_dec

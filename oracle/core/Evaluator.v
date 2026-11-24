@@ -8,7 +8,8 @@
    type checker refuses every such program before it runs: that's the type-safety theorem in Safety.v. *)
 
 From Stdlib Require Import String List Bool ZArith.
-From Ralph Require Import Syntax Whole Io TypedTree Checker.
+From Flocq Require Import IEEE754.BinarySingleNaN.
+From Ralph Require Import Syntax Whole Float Io TypedTree Checker.
 Import ListNotations.
 Import Typed.
 Open Scope list_scope.
@@ -18,6 +19,8 @@ Inductive value :=
 | Whole_value (n : Z)
 | Bool_value (b : bool)
 | Text_value (t : string)
+(* trace: D157 *)
+| Float_value (f : float)
 (* A list's or an array's items, in order (D75, D167). *)
 | List_value (items : list value).
 
@@ -85,14 +88,30 @@ Definition compare_values (operator : binary_operator) (a b : value) : io value 
   | Greater, Whole_value x, Whole_value y => Done (Bool_value (Z.gtb x y))
   | At_least, Whole_value x, Whole_value y => Done (Bool_value (Z.geb x y))
   | At_most, Whole_value x, Whole_value y => Done (Bool_value (Z.leb x y))
+  (* trace: D183, D184. Exact, as IEEE 754 compares; the two zeros are equal. *)
+  | _, Float_value x, Float_value y =>
+      match Bcompare x y, operator with
+      | Some c, Equal => Done (Bool_value (match c with Eq => true | _ => false end))
+      | Some c, Not_equal => Done (Bool_value (match c with Eq => false | _ => true end))
+      | Some c, Less => Done (Bool_value (match c with Lt => true | _ => false end))
+      | Some c, Greater => Done (Bool_value (match c with Gt => true | _ => false end))
+      | Some c, At_least => Done (Bool_value (match c with Lt => false | _ => true end))
+      | Some c, At_most => Done (Bool_value (match c with Gt => false | _ => true end))
+      | _, _ => Stop Stuck
+      end
   | _, _, _ => Stop Stuck
   end.
 
-(* trace: D22, D153, D202. A `Whole` or a `Bool` as text. *)
-Definition text_of (v : value) : io value :=
+(* trace: D22, D153, D155, D202. A `Whole`, a `Bool` or a `Float` as text. *)
+Definition text_of (v : value) (at_ : place) : io value :=
   match v with
   | Whole_value n => Done (Text_value (text_of_whole n))
   | Bool_value b => Done (Text_value (if b then "true" else "false")%string)
+  | Float_value f =>
+      match text_of_float f with
+      | Some t => Done (Text_value t)
+      | None => Stop (Undecided at_ "where `~` goes on a negative number that isn't exact"%string)
+      end
   | _ => Stop Stuck
   end.
 
@@ -171,6 +190,14 @@ Definition has_room (container : type) (items : list value) : bool :=
   | _ => true
   end.
 
+(* trace: D46, D177, D179, D185 *)
+Definition checked_float (at_ : place) (result : float_checked) (operation : option float_operation) (x y : float)
+  : io value :=
+  match result with
+  | Float_fits z => Done (Float_value z)
+  | other => Stop (Float_stopped at_ other operation x y)
+  end.
+
 (* The library's procedures and list methods (chapter 9 and D6, D20, D22, D26, D80, D95, D96, D160, D168). *)
 Definition apply_library (which : library) (values : list value) (at_ : place) : io outcome :=
   match which, values with
@@ -189,6 +216,9 @@ Definition apply_library (which : library) (values : list value) (at_ : place) :
   | Random_number, [Whole_value low; Whole_value high] =>
       if (low <=? high)%Z then Random low high (fun n => Done (Gave (Whole_value n)))
       else Stop (Random_backwards at_ low high)
+  (* trace: D185 *)
+  | Square_root, [Float_value x] =>
+      bind (checked_float at_ (float_sqrt x) None x x) (fun v => Done (Gave v))
   | Add_item container, [List_value items; item] =>
       if has_room container items then Done (Gave (List_value (items ++ [item]))) else Done (Failed "full"%string)
   | Insert_item container from_one, [List_value items; item; Whole_value index] =>
@@ -311,7 +341,51 @@ Fixpoint evaluate (fuel : nat) (where_ : frame) (p : list procedure) (env : envi
                  need_bool b (fun _ => Done (Bool_value true)) (fun _ => Done (Bool_value false)))))
       (* trace: D29, D200 *)
       | Join parts => bind (evaluate_all fuel' where_ p env parts) join_texts
-      | Text_of _ operand => bind (evaluate fuel' where_ p env operand) text_of
+      | Text_of _ operand at_ => bind (evaluate fuel' where_ p env operand) (fun v => text_of v at_)
+      | Float_literal f => Done (Float_value f)
+      (* trace: D177, D179 *)
+      | Float_maths operator left_operand right_operand at_ =>
+          bind (evaluate fuel' where_ p env left_operand) (fun a =>
+            bind (evaluate fuel' where_ p env right_operand) (fun b =>
+              match a, b with
+              | Float_value x, Float_value y => checked_float at_ (float_arithmetic operator x y) (Some operator) x y
+              | _, _ => Stop Stuck
+              end))
+      | Float_negate operand =>
+          bind (evaluate fuel' where_ p env operand) (fun v =>
+            match v with
+            | Float_value x => Done (Float_value (float_negate x))
+            | _ => Stop Stuck
+            end)
+      (* trace: D162 *)
+      | Float_of operand =>
+          bind (evaluate fuel' where_ p env operand) (fun v =>
+            match v with
+            | Whole_value n =>
+                let f := float_of_whole n in
+                if is_finite f then Done (Float_value f)
+                else Stop (Float_stopped {| place_file := 0; place_line := 0; place_column := 0; place_width := 0 |}
+                             Float_too_big None f f)
+            | _ => Stop Stuck
+            end)
+      (* trace: D178 *)
+      | Whole_of_float way operand at_ =>
+          bind (evaluate fuel' where_ p env operand) (fun v =>
+            match v with
+            | Float_value x =>
+                match float_to_whole way x with
+                | Some n => Done (Whole_value n)
+                | None => Stop (Float_to_whole_too_big at_ way x)
+                end
+            | _ => Stop Stuck
+            end)
+      (* trace: D175, D176 *)
+      | Text_places places operand =>
+          bind (evaluate fuel' where_ p env operand) (fun v =>
+            match v with
+            | Float_value x => Done (Text_value (text_with_places x places))
+            | _ => Stop Stuck
+            end)
       (* trace: D75, D167 *)
       | List_literal _ items => bind (evaluate_all fuel' where_ p env items) (fun vs => Done (List_value vs))
       (* trace: D169 *)

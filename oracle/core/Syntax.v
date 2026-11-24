@@ -17,6 +17,8 @@ Inductive type :=
 | Whole
 | Bool
 | Text
+(* trace: D157 *)
+| Float
 | List_of (item : type) (most : option Z)
 | Array_of (item : type) (length : Z).
 
@@ -29,7 +31,7 @@ Definition option_Z_eqb (a b : option Z) : bool :=
 
 Fixpoint type_eqb (a b : type) : bool :=
   match a, b with
-  | Whole, Whole | Bool, Bool | Text, Text => true
+  | Whole, Whole | Bool, Bool | Text, Text | Float, Float => true
   | List_of x m, List_of y n => type_eqb x y && option_Z_eqb m n
   | Array_of x m, Array_of y n => type_eqb x y && Z.eqb m n
   | _, _ => false
@@ -76,6 +78,9 @@ Definition callee_at (c : callee) : place :=
 Inductive expression :=
 (* A whole number as written: its digits (D15). *)
 | Whole_literal (digits : string) (at_ : place)
+(* A number written with a point (D155, D180): its digits before and after the point, and whether it's written with `~`
+   in front. *)
+| Float_literal (before after : string) (approximate : bool) (at_ : place)
 (* Text in double quotes (D21), as its pieces: every text fills in its braces (D200). *)
 | Text_literal (pieces : list piece) (at_ : place)
 | Bool_literal (value : bool) (at_ : place)

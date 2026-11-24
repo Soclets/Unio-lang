@@ -621,6 +621,20 @@ and parse_primary st =
       | Number digits ->
           advance st;
           Ok (Core.Whole_literal (digits, place_of_token t), span_of t)
+      (* trace: D155, D180 *)
+      | Decimal (before, after) ->
+          advance st;
+          Ok (Core.Float_literal (before, after, false, place_of_token t), span_of t)
+      | Symbol "~" -> (
+          advance st;
+          match peek st with
+          | Some ({ kind = Decimal (before, after); _ } as d) ->
+              advance st;
+              let whole = join st (span_of t) (span_of d) in
+              Ok (Core.Float_literal (before, after, true, place_of whole), whole)
+          | _ ->
+              expected st "a number with a point";
+              Error ())
       | Text raw ->
           advance st;
           Ok (Core.Text_literal (pieces_of raw t.line (t.column + 1), place_of_token t), span_of t)
@@ -961,9 +975,9 @@ let rec parse_type st : Core.type0 parsed =
              ~why:"an array always holds the same number of items, written in its type.");
         Error ()
       end
-  | Some ({ kind = Word "Float"; _ } as t) ->
-      not_built_is st t "`Float` (D157, D162, D163)";
-      Error ()
+  | Some { kind = Word "Float"; _ } ->
+      advance st;
+      Ok Core.Float
   | Some ({ kind = Word w; _ } as t) when String.length w > 0 && w.[0] >= 'A' && w.[0] <= 'Z' ->
       (* trace: D161 *)
       report st

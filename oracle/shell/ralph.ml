@@ -67,6 +67,13 @@ let read_answer () =
 
 let arithmetic_symbol = function Core.Plus -> "+" | Core.Minus -> "-" | Core.Times -> "*"
 
+(* trace: D56, D103. Something not decided, found only while running: the program stops with `NotDesignedYet`,
+   status 3. *)
+let undecided files p what =
+  end_open_line ();
+  print_messages files [ M.message M.Not_designed_yet (Wording.at p) ~what:(what ^ " isn't decided yet") ];
+  finish 3
+
 (* Walks the evaluator's tree of requests (core/Io.v), doing each one. *)
 let rec walk files (tree : unit Core.io) =
   match tree with
@@ -231,6 +238,57 @@ let rec walk files (tree : unit Core.io) =
                 ~why:"`?? crash` stops the program when the call before it fails.";
             ];
           finish 5
+      (* trace: D46, D177, D185. Drafts. *)
+      | Core.Float_stopped (p, why, operation, x, y) -> (
+          end_open_line ();
+          let shown f = Core.text_of_float f in
+          let symbol = function
+            | Core.Float_plus -> "+"
+            | Core.Float_minus -> "-"
+            | Core.Float_times -> "*"
+            | Core.Float_divide -> "/"
+          in
+          let when_ =
+            match (operation, shown x, shown y) with
+            | Some op, Some a, Some b -> Some (Printf.sprintf "%s %s %s" a (symbol op) b)
+            | None, Some a, _ -> Some (Printf.sprintf "sqrt(%s)" a)
+            | _ -> None
+          in
+          match when_ with
+          | None -> undecided files p "where `~` goes on a negative number that isn't exact"
+          | Some when_ ->
+              let what, why =
+                match why with
+                | Core.Float_too_big ->
+                    ( "the result is too big for a `Float`",
+                      "a `Float` is always a real number, and this one is past the largest a `Float` holds." )
+                | Core.Float_by_zero -> ("a `Float` can't be divided by zero", "dividing by zero has no answer.")
+                | Core.Float_negative_root | Core.Float_fits _ ->
+                    ( "a negative number has no square root",
+                      "a `Float` is always a real number, and no real number squared is negative." )
+              in
+              print_messages files [ M.message M.Check_failed (Wording.at p) ~what ~when_ ~why ];
+              finish 4)
+      (* trace: D46, D178. A draft. *)
+      | Core.Float_to_whole_too_big (p, way, x) -> (
+          end_open_line ();
+          let name =
+            match way with
+            | Core.Whole_floor -> "be.Whole.floor"
+            | Core.Whole_trunc -> "be.Whole.trunc"
+            | Core.Whole_ceil -> "be.Whole.ceil"
+            | Core.Whole_nearest -> "be.Whole.nearest"
+            | Core.Whole_nearest_even -> "be.Whole.nearest.even"
+          in
+          match Core.text_of_float x with
+          | None -> undecided files p "where `~` goes on a negative number that isn't exact"
+          | Some shown ->
+              print_messages files
+                [ M.message M.Check_failed (Wording.at p) ~what:"the result is too big for a `Whole`"
+                    ~when_:(Printf.sprintf "%s(%s)" name shown)
+                    ~why:"a `Whole` holds whole numbers from -9223372036854775808 to 9223372036854775807." ];
+              finish 4)
+      | Core.Undecided (p, what) -> undecided files p what
       | Core.Passing_up _ ->
           end_open_line ();
           prerr_string (M.internal_error "a failure passed up out of `proc.main`");

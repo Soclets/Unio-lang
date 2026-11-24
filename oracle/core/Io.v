@@ -6,7 +6,7 @@
    pure and provable. *)
 
 From Stdlib Require Import String ZArith.
-From Ralph Require Import Syntax Whole.
+From Ralph Require Import Syntax Whole Float.
 
 (* Why a program stopped before reaching its end. *)
 Inductive arithmetic_operation :=
@@ -28,6 +28,13 @@ Inductive stop :=
 (* trace: D172. A `range` that can never reach its end: its first number, its end, whether that's included, and its
    step. *)
 | Range_never_ends (at_ : place) (first last : Z) (included : bool) (step : Z)
+(* trace: D46, D177, D185. A `Float` operation stopped: too big for a `Float`, dividing by zero, or `sqrt` of a negative
+   number; the operation ([None] for `sqrt`) and its values. *)
+| Float_stopped (at_ : place) (why : float_checked) (operation : option float_operation) (x y : float)
+(* trace: D178. `be.Whole.floor` and the rest given a `Float` too big for a `Whole`. *)
+| Float_to_whole_too_big (at_ : place) (way : to_whole) (x : float)
+(* Something not decided, found only while running: what it is, worded as D103 does. *)
+| Undecided (at_ : place) (what : string)
 (* trace: D152. `?? crash` met a failure: the procedure that failed and the failure. *)
 | Crashed (at_ : place) (procedure failure : string)
 (* trace: D23. `?` passing a failure up: it leaves the procedure, which gives it to its caller. Never the end of a

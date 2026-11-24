@@ -1,7 +1,7 @@
 (rocq.extraction
  (prelude Extract)
  (extracted_modules core)
- (theories Stdlib Ralph))
+ (theories Stdlib Flocq Ralph))
 
 ; Extracted code isn't written by hand, so warnings about its style are off; Rocq checks what it does.
 
