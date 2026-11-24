@@ -11,7 +11,12 @@ cd oracle && opam exec --switch=ralph -- dune build @check -j 3
 ```
 
 It builds the Rocq core (checking every proof), extracts it to OCaml, builds the shell and the test runner, checks
-`Print Assumptions` for every main theorem, runs every test in `../tests`, and writes `test-status.json`.
+`Print Assumptions` for every main theorem against `assumptions/axioms.txt`, runs every test in `../tests`, writes
+`test-status.json`, and tests reading and showing `Float`s against Python on 22,008 cases.
+
+`check/`'s command: `cd check && opam exec --switch=ralph -- dune exec ./check.exe -- 300 1000` compares 300 random
+programs from seed 1000 on Ralph and Beta++ in both modes and writes `check/report.md`; `./check.exe tests` runs every
+test on all three; `./check.exe show SEED` prints one generated program.
 
 To run a program by hand: `opam exec --switch=ralph -- dune exec --root oracle -- ralph PROGRAM.unio`, or the built
 `oracle/_build/default/shell/ralph.exe PROGRAM.unio`.
@@ -73,7 +78,7 @@ Each checkpoint ends with something running, committed and pushed.
    (D155, D181 to D183), `places:` (D175, D176). Proved with Flocq: each operation gives the nearest `Float`, ties to
    even, or stops; each rounding to `Whole` gives D178's number or stops.
 6. [x] **Every other decided refusal,** with drafted wordings sent to the design session in batches.
-7. [ ] **`check/`:** a generator written from `standard/`, one printer, a list of what it doesn't generate yet, and a
+7. [x] **`check/`:** a generator written from `standard/`, one printer, a list of what it doesn't generate yet, and a
    comparison of Ralph with `Beta++` in both modes on every generated program and test, shrinking any difference.
 
 ### Order of proofs
@@ -93,6 +98,20 @@ Each checkpoint ends with something running, committed and pushed.
 - D8's missing `:` refusal: gone; an opening line ending in `:` is refused instead (D199).
 
 ## Status
+
+**2026-11-24, 11:25: the finish line's four parts hold**, apart from the questions below, which wait on Tankun:
+1. Every decision is built, D1 to D207, except `extern.cpp`'s C++ bodies, build modes, colours and fonts, what isn't
+   decided (`NotDesignedYet`), and the memory cap (D115, D122, D134), asked about.
+2. All 53 tests pass.
+3. Proven with nothing beyond `assumptions/axioms.txt`: `type_safety` (all of Unio as built), `whole_arithmetic_exact`,
+   `whole_negate_exact`, `whole_division_exact`, `float_arithmetic_correct`, `float_sqrt_correct`,
+   `float_to_whole_exact`.
+4. `check/` runs: 300 programs, 121 the same, 177 skipped (mostly Beta++'s `NotBuiltYet` for dividing), 2 different
+   (Beta++ `--final` crashing, sent). It found two Ralph bugs, fixed.
+
+Questions waiting (all sent to the design session): the memory cap; `~0.5` refused or not; where `~` goes on a
+negative number; `be.Float` above 2^53; a too-big `Float` literal; a `len.max` list where a plain one goes; `[]` with no
+type; `?` in `proc.main`; a line after `instead`; checking unused handlers; when a handler's arguments are worked out.
 
 2026-11-24, 10:50: comment blocks and `///` (D74), procedure and handler families, `include` and handler parameters
 (D41 to D44), D126's shared type in front, D81's operator after a step, `extern.cpp` declarations (stopping with
