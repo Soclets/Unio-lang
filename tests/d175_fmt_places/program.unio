@@ -1,12 +1,12 @@
 proc.main
     let speed: Float = ~0.1 + ~0.2;
-    show_msg.fmt("Speed: {speed, places: 2}");
-    show_msg.fmt("{speed, places: 0}");
+    show_msg("Speed: {speed, places: 2}");
+    show_msg("{speed, places: 0}");
     let half: Float = 0.5;
-    show_msg.fmt("{half, places: 3}");
+    show_msg("{half, places: 3}");
     let eighth: Float = 0.125;
-    show_msg.fmt("{eighth, places: 2}");
-    let line: Text = be.Text.fmt("{speed, places: 4}!");
+    show_msg("{eighth, places: 2}");
+    let line: Text = "{speed, places: 4}!";
     show_msg(line);
     show_msg(be.Text(speed));
 end proc.main

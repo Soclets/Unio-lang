@@ -1,10 +1,10 @@
 proc.main
     let students: List<Text> = ["Fern", "Plern", "Churn"];
     for each name at pos place in students
-        show_msg.fmt("{place}. {name}");
+        show_msg("{place}. {name}");
     end for
     for each student at offset i in students
-        show_msg.fmt("{i}: {student}");
+        show_msg("{i}: {student}");
         show_msg(students[offset: i]);
     end for
 end proc.main

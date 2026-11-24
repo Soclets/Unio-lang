@@ -8,7 +8,7 @@ colours, drawing at a position and clearing the screen, on Windows, macOS and Li
 package (D63). What the terminal part is built on isn't decided since D131 moved the runtime to C++.
 
 The built-ins are (D196):
-- **Procedures:** `show_msg`, with its narrowings `.fmt` (short for format) and `.same_line` (D6, D29); `ask` (D20);
+- **Procedures:** `show_msg`, with its narrowing `.same_line` (D6); `ask` (D20);
   `be`, which converts, as in `be.Whole(typed)` (D22); `random` and `sqrt`, below.
 - **Facts:** `.len`, short for length, a list's number of items (D79).
 - **Others:** `range`, below.

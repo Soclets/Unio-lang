@@ -1,1 +1,1 @@
-.fmt on show_msg and be.Text filling in names, plain text staying plain, and .fmt.same_line. D6, D29, D31, D192; standard ch. 7.
+Every text filling in names in braces, in show_msg and in a variable, \{ showing a brace as it is, and show_msg.same_line. D6, D29, D30, D192, D200; standard ch. 7.

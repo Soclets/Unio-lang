@@ -1,5 +1,5 @@
 proc.main
     let drift: Float = 0.25 - 0.251953125;
-    show_msg.fmt("{drift, places: 2}");
-    show_msg.fmt("{drift, places: 3}");
+    show_msg("{drift, places: 2}");
+    show_msg("{drift, places: 3}");
 end proc.main

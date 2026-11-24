@@ -8,5 +8,5 @@ proc.main
         total = total + score;
         show_msg(be.Text(score));
     end for
-    show_msg.fmt("Total: {total}");
+    show_msg("Total: {total}");
 end proc.main

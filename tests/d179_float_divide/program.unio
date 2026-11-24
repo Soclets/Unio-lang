@@ -4,5 +4,5 @@ proc.main
     let quarter: Float = 1.0 / 4.0;
     show_msg(be.Text(quarter));
     let half: Float = 7.0 / 2.0;
-    show_msg.fmt("{half, places: 1}");
+    show_msg("{half, places: 1}");
 end proc.main

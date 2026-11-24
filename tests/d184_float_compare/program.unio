@@ -22,5 +22,5 @@ proc.main
         timer = timer + ~0.1;
         steps = steps + 1;
     end while
-    show_msg.fmt("{steps} steps, {timer}");
+    show_msg("{steps} steps, {timer}");
 end proc.main

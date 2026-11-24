@@ -4,7 +4,7 @@ proc show_ways[x: Float]
     let up: Whole = be.Whole.ceil(x);
     let near: Whole = be.Whole.nearest(x);
     let even: Whole = be.Whole.nearest.even(x);
-    show_msg.fmt("{down} {cut} {up} {near} {even}");
+    show_msg("{down} {cut} {up} {near} {even}");
 end proc show_ways
 
 proc.main

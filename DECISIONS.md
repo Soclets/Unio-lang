@@ -908,6 +908,8 @@ read a value, never do work. It replaces long `&` chains with `be.Text` in each 
 **Tankun's words.** "What about Cyborg's `@fmt`?", "How about `.fmt`?", then, asked "`.fmt` on `show_msg` and
 `be.Text`, with braces holding only names, checked while building?", the owner chose: "yea".
 
+(Changed by D200: every text fills its braces, and `.fmt` goes.)
+
 ## D30. `\` makes the next character literal, with no C-style codes
 
 2026-11-20.
@@ -6034,6 +6036,8 @@ so, then we should differentiate keyword vs built-in proc, or use another term",
 procedures`?", then, asked "Should Unio have keywords and built-ins, with `be`, `.fmt`, `.same_line` and `.len`
 moving to the built-ins?", the owner chose: "yea"
 
+(Changed by D200: `.fmt` goes, since every text fills its braces.)
+
 ## D197. A narrowing takes the colour of what it narrows
 
 2026-11-24.
@@ -6122,3 +6126,34 @@ D165). Ruby and Seal (Seal D9) open blocks the same way.
 **Tankun's words.** "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What
 about the font?" (quoted whole in D194), then, asked "Should block openers lose their `:`, as in `if hp at_least max`
 and `else`, replacing D8's `:`?", the owner chose: "yea. How do i switch Claude to atkin for code"
+
+## D200. Every text fills in what's in braces, with `\{` for a brace as it is; `.fmt` goes
+
+2026-11-24.
+
+**Chosen.** Text fills in the names in its braces wherever it's written, replacing D29's `.fmt`:
+
+```
+show_msg("Found the {item}!");
+let line: Text = "{name}: {score}";
+show_msg("Type \{help} for commands");
+```
+
+- **A brace to show as it is is written `\{`,** D30's escape, so the last line shows `Type {help} for commands`.
+- **Everything else D29 and D175 say about braces stands:** they hold only a variable's name, a number in them becomes
+  text by itself, a name that isn't a variable is refused while building, and a `Float` can take `places:`.
+- **`.fmt` goes,** from `show_msg` and `be.Text`, and from D196's built-ins. `show_msg.same_line` stays.
+
+**Weighed.**
+- `.fmt` (D29). Plain text stays plain, so text full of braces needs no `\`, but there are two kinds of text, and
+  `show_msg("{tries}")` showing `{tries}` is a beginner trap.
+- A form for whole text taken as it is, with no filling. `\{` already covers each brace, and text full of braces is
+  rare in terminal games.
+
+**Why this won.** One kind of text, filled the same way in a call or a variable, as Swift, Kotlin, Ruby and
+JavaScript's template text do. A brace that wasn't meant to fill gets caught while building, since a name in braces
+must be a variable, and the fix is a `\`.
+
+**Tankun's words.** "Should we make Unio have only format text? Even in like vars? And an non-default way to be
+literal", then, asked "Should every text fill `{name}` by itself, with `\{` for a literal brace, replacing `.fmt`?",
+the owner chose: "yea"

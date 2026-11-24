@@ -5,5 +5,5 @@ proc.main
     show_msg(be.Text(back));
     let half: Float = 2.5;
     show_msg(be.Text(half));
-    show_msg.fmt("{whole_speed, places: 0}");
+    show_msg("{whole_speed, places: 0}");
 end proc.main

@@ -63,7 +63,7 @@ The colours are (D194):
 |---|---|---|---|
 | keywords, as in `if`, `let`, `eq` | green, bold | `#859900` | `#687700` |
 | variables and parameters | blue | `#3a95d6` | `#2073ae` |
-| procedures, built-in ones included, as in `heal`, `show_msg.fmt`, `be.Whole` | yellow | `#b58900` | `#8b6900` |
+| procedures, built-in ones included, as in `heal`, `show_msg.same_line`, `be.Whole` | yellow | `#b58900` | `#8b6900` |
 | methods and facts, as in `bag.add(x)`, `bag.len` | orange | `#d7744c` | `#c14715` |
 | types, as in `Whole`, `List<Text>` | pink | `#de66a0` | `#c8337c` |
 | labels, as in `by:` | violet, italic | `#8589ce` | `#6368b4` |
@@ -72,7 +72,7 @@ The colours are (D194):
 | brackets, punctuation and operators | grey | `#8f8f8f` | `#6e6e6e` |
 | errors only: `refused:`, `check failed:`, `failed:` and the `^` under the cause | red | `#e56765` | `#d3302d` |
 
-A narrowing takes the colour of what it narrows, so a narrowed name is one colour across its `.`: `show_msg.fmt` is
+A narrowing takes the colour of what it narrows, so a narrowed name is one colour across its `.`: `show_msg.same_line` is
 all yellow, a procedure's, and `proc.main` all green and bold, a keyword's. A method or a fact changes colour at its
 `.`, as in `bag.len`, a variable's blue then orange (D197).
 

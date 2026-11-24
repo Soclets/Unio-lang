@@ -16,9 +16,9 @@ end proc is_odd
 
 proc show_even[n: Whole]
     if is_even(n)
-        show_msg.fmt("{n} is even");
+        show_msg("{n} is even");
     else
-        show_msg.fmt("{n} is odd");
+        show_msg("{n} is odd");
     end if
 end proc show_even
 

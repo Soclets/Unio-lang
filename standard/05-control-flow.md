@@ -56,7 +56,7 @@ Conditions combine with `and`, `or` and `not`: `not` first, then `and`, then `or
 
 ```
 if not won
-    show_msg.fmt("Out of tries! It was {secret}.");
+    show_msg("Out of tries! It was {secret}.");
 end if
 
 if hp at_least 1 and lives > 0 or cheat eq true
@@ -107,7 +107,7 @@ for each name in students
 end for
 
 for each round in range[from: 1, to: 3]
-    show_msg.fmt("Round {round}!");
+    show_msg("Round {round}!");
 end for
 ```
 
@@ -130,7 +130,7 @@ between the item and `in`, the same two words as for reaching an item (D75, D174
 
 ```
 for each name at pos i in students
-    show_msg.fmt("{i}. {name}");
+    show_msg("{i}. {name}");
 end for
 ```
 
@@ -154,7 +154,7 @@ while tries < 7
     else if guess > secret
         show_msg("Too high");
     else
-        show_msg.fmt("Correct! You got it in {tries} tries.");
+        show_msg("Correct! You got it in {tries} tries.");
         break;
     end if
 end while

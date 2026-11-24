@@ -1,8 +1,8 @@
 proc count[n: Whole]
     if n > 0
-        show_msg.fmt("down {n}");
+        show_msg("down {n}");
         count(n - 1);
-        show_msg.fmt("up {n}");
+        show_msg("up {n}");
     end if
 end proc count
 

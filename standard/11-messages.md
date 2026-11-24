@@ -43,7 +43,7 @@ refused: game.unio:5:5, line 5 column 5
 
 Each message's wording is decided in batches, recorded in the decisions: D85 for lines, blocks and variables, D87 for
 declarations, comparing, converting, unhandled failures, joining text and keywords used as names, D88 for procedures,
-calls and `return`, D89 for types, labels lines, narrowing order, parameter forms and `&` beside maths, D92 for `.fmt`,
+calls and `return`, D89 for types, labels lines, narrowing order, parameter forms and `&` beside maths, D92 for filling in text,
 a program's shape, names, unreadable code, overflow and the tools' own messages, D102 for parameters, narrowings,
 `else`, D81's refusals, names in use, knock-on errors, names, blank lines and spacing, D103 for the command's own
 messages, words with no more narrowings, and `NotBuiltYet` and `NotDesignedYet`, D132 for five brought up to date, D142

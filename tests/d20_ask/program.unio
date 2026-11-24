@@ -1,6 +1,6 @@
 proc.main
     let name: Text = ask("Your name: ");
-    show_msg.fmt("Hi, {name}!");
+    show_msg("Hi, {name}!");
     let guess: Whole = be.Whole(ask("A number: ")) ?? 0;
     show_msg(be.Text(guess + 1));
     let bad: Whole = be.Whole(ask("Another: ")) ?? 7;

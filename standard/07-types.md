@@ -113,25 +113,24 @@ show_msg("You got it in " & be.Text(tries) & " tries.");
 
 ### Filling in text
 
-`.fmt` fills in what's in braces. It narrows `show_msg` to show the result, and `be.Text` to give it back as `Text`
-(D29):
+Every text fills in what's in braces, wherever it's written (D29, D200):
 
 ```
-show_msg.fmt("You got it in {tries} tries.");
-let line: Text = be.Text.fmt("{name}: {score}");
+show_msg("You got it in {tries} tries.");
+let line: Text = "{name}: {score}";
 ```
 
 - **Braces hold only a variable's name;** a calculation or a call in them is refused (D29).
 - **A number in braces becomes text by itself** (D29).
 - **The text is checked at compile time:** a name in braces that isn't a variable is refused (D29).
-- **Without `.fmt`, text is plain,** so `show_msg("{tries}")` shows exactly `{tries}` (D29).
+- **A brace to show as it is is written `\{`,** as in `"Type \{help}"`, which shows `Type {help}` (D30, D200).
 
 A `Float` in braces can take a `places:` setting after a comma, rounding it to that many digits after the point, the
 decimal places, and showing it with no `~`, since the text is exactly the rounding asked for (D175):
 
 ```
 let speed: Float = ~0.1 + ~0.2;
-show_msg.fmt("Speed: {speed, places: 2}");   // Speed: 0.30
+show_msg("Speed: {speed, places: 2}");       // Speed: 0.30
 ```
 
 - **It always shows that many places,** so `{half, places: 3}` with `0.5` shows `0.500`, and `places: 0` shows no
@@ -142,17 +141,16 @@ show_msg.fmt("Speed: {speed, places: 2}");   // Speed: 0.30
   (D176).
 - **`places:` on anything but a `Float` is refused** at compile time (D175).
 
-`fmt` is short for format (D2). With `.same_line` as well, it's `show_msg.fmt.same_line`, the stronger narrowing first
-(D31).
+With `.same_line`, the line is left open as usual: `show_msg.same_line("Lives: {lives}, ")` (D6).
 
 ### `\`
 
-Inside text, `\` makes the next character literal, and does nothing else: `\{` is a brace in `.fmt` text, `\"` a quote,
-and `\\` a backslash. Only `{` needs escaping in `.fmt` text, since a `}` with no open `{` is just a character. `\`
+Inside text, `\` makes the next character literal, and does nothing else: `\{` is a brace, `\"` a quote, and `\\` a
+backslash. Only `{` needs escaping, since a `}` with no open `{` is just a character. `\`
 doesn't start C-style codes, so `\n` isn't a new line (D30).
 
 ```
-show_msg.fmt("Type \{help} to see the commands, {name}.");
+show_msg("Type \{help} to see the commands, {name}.");
 show_msg("She said \"hi\".");
 ```
 
@@ -209,7 +207,7 @@ so (D162).
 
 `Decimal` is kept for an exact decimal type, if Unio adds one; it would never need `~` (D155, D157).
 
-A `Float` is shown to a player rounded, with `places:` in `.fmt` braces (D175).
+A `Float` is shown to a player rounded, with `places:` in its braces (D175).
 
 **Not decided:** `Float`'s maths and its other conversions; the wording of D177's check; maths functions such as
 square roots.
