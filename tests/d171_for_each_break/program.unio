@@ -4,9 +4,10 @@ proc.main
     for each score in scores
         if score eq 8
             break;
+        else
+            total = total + score;
+            show_msg(be.Text(score));
         end if
-        total = total + score;
-        show_msg(be.Text(score));
     end for
     show_msg("Total: {total}");
 end proc.main

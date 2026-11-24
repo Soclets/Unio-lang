@@ -1,1 +1,1 @@
-for each goes through a list in order, its variable is new each pass, and break leaves it. D32, D171; standard ch. 5.
+for each goes through a list in order, its variable is new each pass, and break leaves it. D9, D32, D171; standard ch. 5.
