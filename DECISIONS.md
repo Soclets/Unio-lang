@@ -6347,3 +6347,31 @@ either.
 one meaning for each thing it writes.
 
 **Tankun's words.** Asked "Should a variable be refused the name `range`?", the owner chose: "yea"
+
+## D208. The wording of the thirteenth batch: comments, families, handlers, `extern.cpp` and two older refusals
+
+2026-11-24.
+
+**Chosen.** Drafted by the oracle session and reviewed by the design session, as Tankun asked for wordings (D132):
+
+| Refusal | `what:` or `fix:` | `why:` |
+|---|---|---|
+| a `///` with no declaration after it (D74) | `fix:` the line with `//` | `` a `///` describes the declaration on the line right after it; any other comment is written with `//`. `` |
+| a narrowed procedure outside its family (D41) | `` `shout.loud` is a kind of `shout`, so it's declared inside `fam.proc shout` `` | a narrowed procedure is declared inside its word's family, so every kind of it is in one place. |
+| a member of another word's family (D41) | `` `area.circle` isn't `geometry` or a kind of it `` | a family holds its word and the kinds of it. |
+| an unknown handler (D42) | `` there's no handler named `oops.missing` `` | `` a handler is declared with `handler`, inside a `fam.handler` block. `` |
+| a handler that can jump, used without `.*` (D42) | `fix:` with the `.*` added, as `oops.*quit` | `` a handler that can `return` or `break` is marked `.*` where it's used, so the jump shows at the call. `` |
+| `.*` on a handler that can't jump (D42) | `fix:` with the `.*` taken away | `` only a handler that can `return` or `break` is marked `.*`. `` |
+| an `extern.cpp` body holding more than a `labels` line (D36) | `` an `extern.cpp` procedure's body is in C++, so here it holds nothing but a `labels` line `` | `` `extern.cpp` says the procedure is written in C++, outside the Unio file. `` |
+| D126's shared type in front, as `proc add[Whole a, b]` | D132's, with the fix `proc add[a: Whole, b: Whole]` | D132's |
+| an operator after a slide's step (D81) | `fix:` for three or more calls, D102's `(x \|> f \|> g \|> h) + 1`; for one or two, a call, as `double(x) + 1` (D128) | for three or more, D102's; for one or two, "one or two calls are written as calls; a chain of three or more is a slide." |
+
+**Weighed.** Nothing else was weighed: each follows D54's layout and the wording already decided for the nearest
+refusal. For the shorter slide, D102's `why:` speaks of brackets, which its fix no longer uses, so D128's rule is the
+reason given.
+
+**Why this won.** Each says what's wrong and names the rule, as every decided message does.
+
+**Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
+one. If you aren't sure, bring it to me." (quoted in D132), and "Bro, aren't you fucking review them yourself? And give
+them to me when you're unsure?" (quoted in D204).
