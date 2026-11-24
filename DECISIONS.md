@@ -6062,3 +6062,24 @@ shows it.
 thought that yellow meant proc", "Why narrowings the same? Just asking", "`Text.utf16` when needed?", "Good?", "Would
 that be confused with meth?", then, asked "Should a narrowing take the colour of what it narrows?", the owner chose:
 "yea"
+
+## D198. The docs show code in Atkinson Hyperlegible Mono, with no ligatures
+
+2026-11-24.
+
+**Chosen.** Unio's docs show code in Atkinson Hyperlegible Mono, in its regular, bold and italic, with ligatures off,
+so `->`, `!=` and the like always show as the characters a learner types. The terminal and editors keep the learner's
+own font; the docs are the one place Unio picks it.
+
+**Weighed.**
+- JetBrains Mono, a popular font made for code, and Menlo, the Mac's default, shown side by side in D194's colours.
+- A font of Tankun's own, released as CC0. A project of its own, and it can't start from an existing font under the
+  SIL Open Font License, which keeps anything made from one under the same licence. Swapping the docs' font later is
+  one line, so it stays open for later.
+
+**Why this won.** The Braille Institute made the Atkinson Hyperlegible family for readers with low vision, and the
+Mono version keeps look-alikes apart (`0` and `O`, `1`, `l` and `I`), which suits a teaching language. It's free under
+the SIL Open Font License, so the docs can carry it, and it has the bold and italic D194 uses.
+
+**Tankun's words.** "Lol, kinda want my own CC0 font?", "Bro, I think I'm seeing the same fonts here", then, shown the
+three fonts again, the owner chose: "Atkin. Btw, why is `.main` still yellow?"

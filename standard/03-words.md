@@ -81,6 +81,10 @@ or darkened only as far as it takes to reach a contrast ratio of 4.5 (the web's 
 text) on black, Solarized dark (`#002b36`) and VS Code's dark (`#1f1f1f`), or on white and Solarized light (`#fdf6e3`).
 Red is used for nothing but errors.
 
+The docs show code in Atkinson Hyperlegible Mono, the Braille Institute's font for readers with low vision, free under
+the SIL Open Font License, with no ligatures, so `->` shows as the two characters a learner types. The terminal and
+editors keep the learner's own font (D198).
+
 **Not decided:** how the command tells a dark background from a light one.
 
 A name is lowercase English letters `a` to `z`, digits, and `_` between words, starting with
