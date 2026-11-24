@@ -46,7 +46,8 @@ it's used. A parameter is a variable too. A procedure's name is a plain word as 
 
 A name can't be a keyword, a variable's or a procedure's: `let if: Whole = 1;` is refused (D58, D192). If a later
 version of Unio adds a keyword, a program already using that word as a name stops building and has to rename it. A
-variable can't take a procedure's name either, since `roll` and `roll()` would look alike (D94, D192).
+variable can't take a procedure's name either, since `roll` and `roll()` would look alike (D94, D192), nor be named
+`range`, since `range[pos: 1]` would read two ways (D207).
 
 Where code is shown, the `unio` command and the docs colour it, so names, keywords, procedures and types look different
 (D192). Unio has its own fixed colours, the same in the docs, the `unio` command and Unio's editor theme, so a learner

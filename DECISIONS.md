@@ -6329,3 +6329,21 @@ and goes to Tankun.
 **Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
 one. If you aren't sure, bring it to me." (quoted in D132), and "Bro, aren't you fucking review them yourself? And give
 them to me when you're unsure?" (quoted in D204).
+
+## D207. A variable can't be named `range`
+
+2026-11-24.
+
+**Chosen.** `let range: List<Whole> = [4, 8];` is refused, as a variable taking a procedure's name is (D94, D192), with
+D102's message naming `range` as a built-in: what "`` `range` is already a built-in's name ``", why "`` a variable
+can't take a built-in's name, since `range` and `range[…]` would look alike. ``". A parameter can't be named `range`
+either.
+
+**Weighed.**
+- Allowing it, reading `range[` as a range unless a variable of that name is declared, as the oracle session built
+  meanwhile. `range[pos: 1]` would then mean a list's first item in one program and a range in another.
+
+**Why this won.** `range` isn't a procedure, so D94 didn't cover it, but `range[pos: 1]` reads two ways, and Unio keeps
+one meaning for each thing it writes.
+
+**Tankun's words.** Asked "Should a variable be refused the name `range`?", the owner chose: "yea"

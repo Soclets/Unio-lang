@@ -13,7 +13,7 @@ The built-ins are (D196):
 - **Facts:** `.len`, short for length, a list's number of items (D79).
 - **Others:** `range`, below.
 
-They aren't keywords. A variable can't take a built-in procedure's name, as with any procedure's (D94), and they're
+They aren't keywords. A variable can't take a built-in procedure's name, as with any procedure's (D94), nor be named `range` (D207), and they're
 coloured as what they are, so `be.Whole` is a procedure's yellow (D194). The docs teach a short name's full word, as
 for keywords (D2).
 
