@@ -32,8 +32,9 @@ That subset is a small part of Unio. Since then the design session and Tankun ha
 D195: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
 D42 to D44, D186), families (D41), comments and spacing (D74, D97, D98), several files in one program (D64, D188),
 `Bool` conditions (D187), and new spellings (D190: `eq` and `not_eq` for `==` and `!=`, `-> Type` for `returns`, and
-`! [ … ]` for `fails`; D192: names have no `$`). The compiler is now called `Beta++` (D191). Tests in `tests/`
-changed with D190 and D192, so some your first milestone passed now fail until Ralph reads the new spellings.
+`! [ … ]` for `fails`; D192: names have no `$`; D195: `labels [ … ]`). The compiler is now called `Beta++` (D191).
+Tests in `tests/` changed with D190, D192 and D195, so some your first milestone passed now fail until Ralph reads the
+new spellings.
 </context>
 
 <sources>
