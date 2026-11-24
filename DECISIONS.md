@@ -5971,6 +5971,8 @@ No, they don't. I think it's good now", then, asked "Should the second draft bec
 chose: "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What about the
 font?"
 
+(Changed by D197: a narrowing takes the colour of what it narrows. Changed by D196: `be` is a built-in procedure, and `.len` a fact.)
+
 ## D195. The `labels` line puts its pairs in `[ ]`
 
 2026-11-24.
@@ -6029,3 +6031,34 @@ written in Unio, coloured the same way. Chapter 9 was already called "Built in".
 so, then we should differentiate keyword vs built-in proc, or use another term", "So, `keywords` and `built-in
 procedures`?", then, asked "Should Unio have keywords and built-ins, with `be`, `.fmt`, `.same_line` and `.len`
 moving to the built-ins?", the owner chose: "yea"
+
+## D197. A narrowing takes the colour of what it narrows
+
+2026-11-24.
+
+**Chosen.** A narrowing is coloured like the name it narrows, so a narrowed name is one colour across its `.`,
+replacing D194's yellow for every narrowing:
+
+```
+show_msg.fmt("Hi {name}")   // all yellow: a procedure
+proc.main:                  // all green, bold: a keyword
+bag.len                     // blue, then orange: a fact
+```
+
+A method or a fact still changes colour at its `.`, so whether the colour changes tells a narrowed name from a method
+or fact on a value. A type with a narrowing, should Unio have one, would be all pink.
+
+**Weighed.**
+- Every narrowing yellow, as D194 had it. `proc.main` would be green then yellow, and a narrowing on a type, like a
+  `Text.utf16`, would look like a procedure.
+- A colour of its own for narrowings, so long chains like `be.Whole.nearest.even` show each part. An eleventh colour,
+  hard to keep apart from yellow, orange, pink and violet on five backgrounds.
+
+**Why this won.** A narrowed name is one thing, so it gets one colour, and the rule works for narrowings not yet
+decided. A learner needn't remember which words are narrowings: the colour staying the same or changing at the `.`
+shows it.
+
+**Tankun's words.** "Wait, before I continue, Why is `.main` orange?", "They look different enough. But wait, I
+thought that yellow meant proc", "Why narrowings the same? Just asking", "`Text.utf16` when needed?", "Good?", "Would
+that be confused with meth?", then, asked "Should a narrowing take the colour of what it narrows?", the owner chose:
+"yea"
