@@ -239,7 +239,7 @@ var bag: List<Text>[len.max: 10] = [];
 `.add` can fail with the failure `full`, which the program deals with like any failure (D23, D168):
 
 ```
-bag.add("Gem") otherwise:
+bag.add("Gem") otherwise
     case full
         show_msg("Your bag is full!");
 end otherwise

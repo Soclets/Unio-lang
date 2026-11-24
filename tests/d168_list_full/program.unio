@@ -2,7 +2,7 @@ proc.main
     var bag: List<Text>[len.max: 2] = [];
     let found: List<Text> = ["Gem", "Key", "Map"];
     for each item in found
-        bag.add(item) otherwise:
+        bag.add(item) otherwise
             case full
                 show_msg("No room for {item}.");
                 break;

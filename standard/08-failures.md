@@ -59,7 +59,7 @@ load_level(name) ?? crash;
 `otherwise` handles each failure in its own `case` (D23, D40):
 
 ```
-call otherwise:
+call otherwise
     case failure
         body
 end otherwise
@@ -69,7 +69,7 @@ where `call` is the call that can fail, each `failure` one of its failures' name
 for it.
 
 ```
-let best: Whole = load_best_score() otherwise:
+let best: Whole = load_best_score() otherwise
     case not_found
         show_msg("No high score yet.");
         instead 0;
@@ -85,7 +85,7 @@ end otherwise
   `end otherwise` (D186):
 
 ```
-bag.add("Gem") otherwise:
+bag.add("Gem") otherwise
     case full
         show_msg("Your bag is full!");
 end otherwise
@@ -123,7 +123,7 @@ Inside an `otherwise` block, `include family.handler;` brings in a handler's cas
 block's own `case`s cover the failures it doesn't. Together they must cover every failure, none twice (D43):
 
 ```
-let title: Text = load_word(file) otherwise:
+let title: Text = load_word(file) otherwise
     include word_failed.use_placeholder;
     case disk_full
         instead "?";
