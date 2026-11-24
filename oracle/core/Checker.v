@@ -1224,7 +1224,9 @@ Definition procedure_name_taken (p : program) (name : string) (at_ : place) : li
   match find (fun d => match definition_name d with Named n => String.eqb (word_of n) name | Main => false end)
           (program_definitions p) with
   | Some d => [Refused (Name_is_procedure name at_ (Some (definition_name_at d)))]
-  | None => if is_library_word name then [Refused (Name_is_procedure name at_ None)] else []
+  | None =>
+      (* trace: D207. `range` is a built-in too, though not a procedure. *)
+      if is_library_word name || String.eqb name "range" then [Refused (Name_is_procedure name at_ None)] else []
   end.
 
 (* ---------------------------------------------------------------------------------------------------------------- *)
@@ -1773,7 +1775,9 @@ Definition check_definition (p : program) (d : definition) : Typed.block * list 
     end in
   let missing_return :=
     match definition_returns d with
-    | Some t => if always_returns_block rest then [] else [Refused (Missing_return procedure t (definition_name_at d))]
+    | Some t =>
+        if always_returns_block rest || definition_extern d then []
+        else [Refused (Missing_return procedure t (definition_name_at d))]
     | None => []
     end in
   let '(_, body_tree, body_problems) := check_block start rest in

@@ -196,6 +196,8 @@ Record definition := {
   definition_returns : option type;
   (* the failures it lists after `!` (D39, D190) *)
   definition_failures : list (string * place);
+  (* whether it's written in C++ with `extern.cpp` (D36, D131), its body only a `labels` line if anything *)
+  definition_extern : bool;
   definition_body : block;
   definition_at : place }.
 

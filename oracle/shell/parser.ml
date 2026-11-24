@@ -351,10 +351,34 @@ and parse_slide st =
               in
               let _, _, _, step_span = step in
               match peek st with
+              (* trace: D81, D102, D128. An operator after a step goes outside the slide: brackets around a slide
+                 of three calls or more, and a shorter one written as calls. *)
               | Some t when Option.is_some (binary_operator t) || is_symbol "??" t ->
-                  not_built_is st t
-                    "refusing an operator after a slide's step, with brackets as the fix (D81, \
-                     D128),";
+                  let path =
+                    List.fold_left
+                      (fun rest (callee, bracketed, given, s) -> Core.Step (callee, bracketed, given, place_of s, rest))
+                      Core.No_steps (step :: acc)
+                  in
+                  let whole = join st start_span step_span in
+                  let slide = Core.Slide (start, path, place_of whole) in
+                  let source = Array.make (!current_file + 1) [||] in
+                  source.(!current_file) <- Array.map (fun (l : Lexer.line) -> l.text) st.lines;
+                  let chain = Wording.flatten source slide in
+                  let long = match chain with Some (_, links) -> List.length links >= 3 | None -> true in
+                  let text = line_text st whole.line in
+                  let written = String.sub text (whole.first - 1) (whole.stop - whole.first) in
+                  if whole.line = start_span.line then
+                    report st
+                      (M.message M.Refused (M.point t.line t.column t.width)
+                         ~fix:
+                           (M.replace_at text whole.first (whole.stop - whole.first)
+                              (if long then "(" ^ written ^ ")"
+                               else match chain with Some c -> Wording.as_calls c | None -> written))
+                         ~why:
+                           (if long then
+                              "a slide's step is a procedure, so an operator after it goes outside brackets around \
+                               the slide."
+                            else Wording.chain_why));
                   Error ()
               | _ -> steps (step :: acc) step_span)
           | _ ->
@@ -659,8 +683,7 @@ and parse_primary st =
           advance st;
           Ok (Core.Bool_literal (false, place_of_token t), span_of t)
       (* trace: D170 *)
-      | Word "range" when next_is_after st 1 (is_symbol "[") && not (List.mem "range" st.variables)
-        ->
+      | Word "range" when next_is_after st 1 (is_symbol "[") ->
           advance st;
           let* given, close = parse_arguments_until st "]" in
           let whole = join st (span_of t) close in
@@ -705,8 +728,9 @@ and parse_primary st =
               let* items, close = parse_arguments_until st "]" in
               let whole = join st (span_of t) close in
               Ok (Core.List_literal (items, place_of whole), whole))
+      (* trace: D64. A package's name in front of a procedure's; the manifest packages are listed in isn't decided. *)
       | Symbol "::" ->
-          not_built st t "packages, named with `::` (D64),";
+          not_designed st t "the manifest that lists packages";
           Error ()
       | _ ->
           expected st "a value";
@@ -1519,9 +1543,51 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
     when String.length w > 0
          && w.[0] >= 'A'
          && w.[0] <= 'Z'
-         && not (next_is_after st 1 (is_symbol ":")) ->
-      not_built_is st t "refusing a type written once in front of several parameters (D126, D132)";
-      Error ()
+         && not (next_is_after st 1 (is_symbol ":")) -> (
+      (* trace: D61, D126, D132. A type written once in front, as in `[Whole a, b]`: refused, with each parameter
+         writing its own type as the fix, and read on as that. *)
+      let type_start = t.column in
+      match parse_type st with
+      | Error () -> Error ()
+      | Ok written ->
+          let type_text =
+            match previous st with
+            | Some last when last.line = t.line -> String.sub (line_text st t.line) (type_start - 1) (last.column + last.width - type_start)
+            | _ -> describe t.kind
+          in
+          let rec names acc =
+            match peek st with
+            | Some ({ kind = Word n; _ } as nt) -> (
+                advance st;
+                check_name st nt n n;
+                let acc = { Core.parameter_name = n; parameter_at = place_of_token nt; parameter_type = written } :: acc in
+                match peek st with
+                | Some c when is_symbol "," c ->
+                    advance st;
+                    names acc
+                | Some c when is_symbol "]" c ->
+                    advance st;
+                    Ok (List.rev acc, c)
+                | _ ->
+                    expected st "`]`";
+                    Error ())
+            | _ ->
+                expected st "a parameter's name";
+                Error ()
+          in
+          let* parameters, close = names [] in
+          if close.line = open_bracket.line then begin
+            let inside =
+              String.concat ", " (List.map (fun (x : Core.parameter) -> x.parameter_name ^ ": " ^ type_text) parameters)
+            in
+            report st
+              (M.message M.Refused (M.point t.line t.column (String.length type_text))
+                 ~fix:
+                   (M.replace_at (line_text st open_bracket.line) (open_bracket.column + 1)
+                      (close.column - open_bracket.column - 1) inside)
+                 ~why:"each parameter writes its own type after its name, as a declaration does.")
+          end;
+          Ok parameters)
   | _ ->
       let rec loop acc =
         match peek st with
@@ -1564,8 +1630,8 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
 
 (* trace: D4, D8, D37, D38, D58, D132, D165, D190, D199. `proc name[parameters] -> Type`, its body, and
    `end proc name`. *)
-let parse_definition st (keyword : token) depth (family : string option) : Core.definition option =
-  begin_line st keyword depth;
+let parse_definition ?(starts_line = true) st (keyword : token) depth (family : string option) : Core.definition option =
+  if starts_line then begin_line st keyword depth;
   advance st;
   let header =
     match peek st with
@@ -1749,6 +1815,7 @@ let parse_definition st (keyword : token) depth (family : string option) : Core.
                     definition_parameters = parameters;
                     definition_returns = returns;
                     definition_failures = failures;
+                    definition_extern = false;
                     definition_body = body;
                     definition_at = place_of_token keyword;
                   }
@@ -2010,10 +2077,43 @@ let parse ~file (lines : Lexer.line list) =
       | None -> List.rev acc
       | Some t when is_word "proc" t -> (
           match parse_definition st t 0 None with Some d -> definitions (d :: acc) | None -> List.rev acc)
-      | Some t when is_word "extern" t ->
-          not_built st t "procedures written in C++, `extern.cpp` (D36, D131),";
-          st.stopped <- true;
-          List.rev acc
+      (* trace: D36, D131. `extern.cpp` in front of `proc`: a procedure written in C++, whose body holds nothing or
+         only a `labels` line. Ralph can't run C++, and where its code lives isn't decided, so the program stops
+         there. *)
+      | Some t when is_word "extern" t -> (
+          begin_line st t 0;
+          advance st;
+          match (peek st, peek_ahead st 1, peek_ahead st 2) with
+          | Some d, Some ({ kind = Word "cpp"; _ } as c), Some ({ kind = Word "proc"; _ } as k) when is_symbol "." d -> (
+              advance st;
+              advance st;
+              match parse_definition ~starts_line:false st k 0 None with
+              | Some def ->
+                  (match def.definition_body with
+                  | Core.Empty | Core.Then (Core.Labels _, Core.Empty) -> ()
+                  | _ ->
+                      (* A draft wording. *)
+                      report st
+                        (M.message M.Refused (M.point k.line k.column 4)
+                           ~what:"an `extern.cpp` procedure's body is in C++, so here it holds nothing but a `labels` line"
+                           ~why:"`extern.cpp` says the procedure is written in C++, outside the Unio file."));
+                  report st
+                    (M.message M.Not_designed_yet
+                       (M.point t.line t.column (c.column + c.width - t.column))
+                       ~what:"where an `extern.cpp` procedure's C++ code lives, and how it's built and linked, isn't decided yet");
+                  definitions ({ def with Core.definition_extern = true } :: acc)
+              | None -> List.rev acc)
+          | Some d, Some ({ kind = Word n; _ } as nt), _ when is_symbol "." d ->
+              report st
+                (M.message M.Refused (M.point nt.line nt.column nt.width)
+                   ~what:(Printf.sprintf "`extern` has no narrowing `.%s`" n)
+                   ~why:"`extern`'s only narrowing is `.cpp`.");
+              st.stopped <- true;
+              List.rev acc
+          | _ ->
+              expected st "`.cpp`";
+              st.stopped <- true;
+              List.rev acc)
       | Some t when is_word "fam" t -> definitions (List.rev_append (parse_family st t) acc)
       | Some t when is_word "comment" t ->
           begin_line st t 0;

@@ -287,6 +287,10 @@ let refusal source (r : Core.refusal) : M.message =
         ~what:(Printf.sprintf "%s is a variable, not a procedure" (quoted name))
         ~why:"only a procedure can be called."
   (* trace: D94, D102, D192 *)
+  (* trace: D207 *)
+  | Core.Name_is_procedure ("range", p, _) ->
+      refused p ~what:"`range` is already a built-in's name"
+        ~why:"a variable can't take a built-in's name, since `range` and `range[…]` would look alike."
   | Core.Name_is_procedure (name, p, declared) ->
       refused p
         ~what:(Printf.sprintf "%s is already a procedure's name" (quoted name))

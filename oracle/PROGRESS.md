@@ -65,14 +65,14 @@ Each checkpoint ends with something running, committed and pushed.
    `pos:` and `offset:`, `.len`, `.add`, `.remove`, setting an item, `range[…]` with `step_by:`, `for each` with
    `at pos` and `at offset`, and D173. `/`, `div.floor`, `div.trunc`, `rem.floor`, `rem.trunc` (D70, D71, D72), with
    their checks. Proved: type safety for all of it; dividing and remainders exact.
-4. [ ] **Failures in full:** done with checkpoint 3: `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash`
+4. [x] **Failures in full:** done with checkpoint 3: `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash`
    (D152, status 5), `otherwise` with `case` and `instead`, D186. Left: handler families, `include`, handler parameters, `.*`; procedure
    families (`fam.proc`, D41); comments (`//`, `///`, `comment` blocks, D74).
 5. [x] **Floats** (all but the proof of D178's roundings, still to do): `Float`, literals with `~` (D155, D180), `+ - * /` and `sqrt` with D177's check, comparisons and
    D184, `be.Float`, `be.Whole.floor`/`.trunc`/`.ceil`/`.nearest`/`.nearest.even` (D178), `be.Text` of a `Float`
    (D155, D181 to D183), `places:` (D175, D176). Proved with Flocq: each operation gives the nearest `Float`, ties to
    even, or stops; each rounding to `Whole` gives D178's number or stops.
-6. [ ] **Every other decided refusal,** with drafted wordings sent to the design session in batches.
+6. [x] **Every other decided refusal,** with drafted wordings sent to the design session in batches.
 7. [ ] **`check/`:** a generator written from `standard/`, one printer, a list of what it doesn't generate yet, and a
    comparison of Ralph with `Beta++` in both modes on every generated program and test, shrinking any difference.
 
@@ -93,6 +93,16 @@ Each checkpoint ends with something running, committed and pushed.
 - D8's missing `:` refusal: gone; an opening line ending in `:` is refused instead (D199).
 
 ## Status
+
+2026-11-24, 10:50: comment blocks and `///` (D74), procedure and handler families, `include` and handler parameters
+(D41 to D44), D126's shared type in front, D81's operator after a step, `extern.cpp` declarations (stopping with
+`NotDesignedYet`, since where the C++ lives isn't decided), and D207 are built. 53 of 53 tests pass. What's left of
+the language: the memory cap (D115, D122, D134), asked about below. Next: `check/`.
+
+Readings taken meanwhile, sent to the design session:
+- A handler's cases are checked where it's used, as if written there (D42); a handler never used isn't checked.
+- A handler's arguments that call a procedure stop with `NotDesignedYet`, since whether they're worked out before the
+  call or when a case runs isn't clear from D44.
 
 2026-11-24, 10:35: floats are built, and all 53 tests pass. Proven: `float_arithmetic_correct` and `float_sqrt_correct`
 (Flocq), with type safety now covering floats too. The theorems about floats rest on Flocq's four axioms, listed with
