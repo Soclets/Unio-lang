@@ -10,12 +10,12 @@
    program runs only when there are no refusals at all, and the second type checker agrees (see [check_program]). *)
 
 From Stdlib Require Import String List Bool ZArith.
-From Ralph Require Import Syntax Whole Diagnostics TypedTree Procedures.
+From Ralph Require Import Whole Syntax Diagnostics TypedTree Procedures.
 Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
 
-Inductive kind_of_variable := Let_variable | Var_variable | Parameter_variable.
+Inductive kind_of_variable := Let_variable | Var_variable | Parameter_variable | Loop_variable.
 
 (* What the checker knows about a variable in use. *)
 Record variable_info := {
@@ -34,21 +34,32 @@ Record setting := {
   setting_ended : list (string * place);
   setting_in_loop : bool;
   setting_procedure : string;
-  setting_returns : option type }.
+  setting_returns : option type;
+  (* the failures the procedure lists after `!`, and where its name is; [None] in `proc.main` *)
+  setting_failures : option (list string * place);
+  (* the lists `for each` loops are going through here, and where each loop is (D173) *)
+  setting_going_through : list (string * place);
+  (* inside a case: the type `instead` gives, if any, and the procedure whose failure it handles *)
+  setting_case : option (option type * string) }.
+
+Definition change_setting (s : setting) (scope : list variable_info) (ended : list (string * place)) (in_loop : bool)
+    (going_through : list (string * place)) (case : option (option type * string)) : setting :=
+  {| setting_program := setting_program s; setting_scope := scope; setting_ended := ended;
+     setting_in_loop := in_loop; setting_procedure := setting_procedure s; setting_returns := setting_returns s;
+     setting_failures := setting_failures s; setting_going_through := going_through; setting_case := case |}.
 
 Definition with_scope (s : setting) (scope : list variable_info) : setting :=
-  {| setting_program := setting_program s; setting_scope := scope; setting_ended := setting_ended s;
-     setting_in_loop := setting_in_loop s; setting_procedure := setting_procedure s;
-     setting_returns := setting_returns s |}.
+  change_setting s scope (setting_ended s) (setting_in_loop s) (setting_going_through s) (setting_case s).
 
 Definition with_ended (s : setting) (ended : list (string * place)) : setting :=
-  {| setting_program := setting_program s; setting_scope := setting_scope s; setting_ended := ended;
-     setting_in_loop := setting_in_loop s; setting_procedure := setting_procedure s;
-     setting_returns := setting_returns s |}.
+  change_setting s (setting_scope s) ended (setting_in_loop s) (setting_going_through s) (setting_case s).
 
 Definition in_loop (s : setting) : setting :=
-  {| setting_program := setting_program s; setting_scope := setting_scope s; setting_ended := setting_ended s;
-     setting_in_loop := true; setting_procedure := setting_procedure s; setting_returns := setting_returns s |}.
+  change_setting s (setting_scope s) (setting_ended s) true (setting_going_through s) (setting_case s).
+
+Definition in_case (s : setting) (gives : option type) (procedure : string) : setting :=
+  change_setting s (setting_scope s) (setting_ended s) (setting_in_loop s) (setting_going_through s)
+    (Some (gives, procedure)).
 
 Definition find_variable (name : string) (scope : list variable_info) : option variable_info :=
   find (fun info => String.eqb (variable_name info) name) scope.
@@ -62,7 +73,7 @@ Definition find_ended (name : string) (ended : list (string * place)) : option p
 (* A stand-in for a refused part of the typed tree; it never runs. *)
 Definition stand_in : Typed.expression := Typed.Whole_literal 0.
 
-(* What a call gives back (D37, D38), and whether it can fail (D23). *)
+(* What a call gives back (D37, D38), and the failures it can give (D23). *)
 Inductive gives := Gives_value (t : type) | Gives_nothing | Gives_unknown.
 
 (* A call in the typed tree: a call proper, or `be.Text`, which the tree writes as [Text_of]. *)
@@ -70,21 +81,28 @@ Inductive called := Called (c : Typed.call) | Pure (e : Typed.expression) | Not_
 
 Record call_check := {
   call_gives : gives;
-  call_can_fail : bool;
+  call_failures : list string;
   call_diagnostics : list diagnostic;
   call_tree : called }.
 
 Definition unknown_call (diagnostics : list diagnostic) : call_check :=
-  {| call_gives := Gives_unknown; call_can_fail := false; call_diagnostics := diagnostics; call_tree := Not_called |}.
+  {| call_gives := Gives_unknown; call_failures := []; call_diagnostics := diagnostics; call_tree := Not_called |}.
 
-Definition make_call (gives : gives) (can_fail : bool) (diagnostics : list diagnostic) (tree : called) : call_check :=
-  {| call_gives := gives; call_can_fail := can_fail; call_diagnostics := diagnostics; call_tree := tree |}.
+Definition make_call (gives : gives) (failures : list string) (diagnostics : list diagnostic) (tree : called)
+  : call_check :=
+  {| call_gives := gives; call_failures := failures; call_diagnostics := diagnostics; call_tree := tree |}.
 
 Definition called_value (c : called) : Typed.expression :=
   match c with
   | Called tree => Typed.Value_of tree
   | Pure e => e
   | Not_called => stand_in
+  end.
+
+Definition called_tree (c : called) : Typed.call :=
+  match c with
+  | Called tree => tree
+  | _ => Typed.Library_call Ask_for_line [] {| place_file := 0; place_line := 0; place_column := 0; place_width := 0 |}
   end.
 
 (* How deep a chain of calls goes, each the first argument of the next, as `f(g(h(x)))` is 3 deep (D128). *)
@@ -103,6 +121,8 @@ Definition same_labels (a b : list string) : bool :=
 
 Definition arithmetic_of (operator : binary_operator) : arithmetic :=
   match operator with Subtract => Minus | Multiply => Times | _ => Plus end.
+
+Definition is_list (t : type) : bool := match item_of t with Some _ => true | None => false end.
 
 (* The type of an operator's result from its sides' types, its tree, or why it's refused. *)
 Definition binary_type (operator : binary_operator) (a b : type) (left_operand right_operand : expression)
@@ -124,14 +144,18 @@ Definition binary_type (operator : binary_operator) (a b : type) (left_operand r
       match a, b with
       | Whole, Whole | Bool, Bool => (Some Bool, Typed.Compare operator a left_tree right_tree, [])
       | Text, Text => (None, stand_in, [Not_designed_yet Comparing_text operator_at])
-      | _, _ => (None, stand_in, [Refused (Compare_types operator a b operator_at)])
+      | _, _ =>
+          if is_list a && is_list b then (None, stand_in, [Not_designed_yet Comparing_lists operator_at])
+          else (None, stand_in, [Refused (Compare_types operator a b operator_at)])
       end
   | Less | Greater | At_least | At_most =>
       match a, b with
       | Whole, Whole => (Some Bool, Typed.Compare operator Whole left_tree right_tree, [])
       | Text, Text => (None, stand_in, [Not_designed_yet Comparing_text operator_at])
       | Bool, Bool => (None, stand_in, [Not_designed_yet Ordering_bools operator_at])
-      | _, _ => (None, stand_in, [Refused (Compare_types operator a b operator_at)])
+      | _, _ =>
+          if is_list a && is_list b then (None, stand_in, [Not_designed_yet Comparing_lists operator_at])
+          else (None, stand_in, [Refused (Compare_types operator a b operator_at)])
       end
   (* trace: D34, D161 *)
   | And | Or =>
@@ -145,18 +169,30 @@ Definition binary_type (operator : binary_operator) (a b : type) (left_operand r
       end
   end.
 
+(* Whether two types differ only in their lists' `len.max`, which isn't decided (D167). *)
+Fixpoint same_but_limits (a b : type) : bool :=
+  match a, b with
+  | List_of x _, List_of y _ => same_but_limits x y
+  | Array_of x m, Array_of y n => same_but_limits x y && Z.eqb m n
+  | _, _ => type_eqb a b
+  end.
+
 (* An expression where a value of type [expected] goes, as in a declaration or an argument. *)
-Definition expect (found : option type) (expected : type) (problem : type -> diagnostic) : list diagnostic :=
+Definition expect (found : option type) (expected : type) (problem : type -> diagnostic) (at_ : place)
+  : list diagnostic :=
   match found with
-  | Some t => if type_eqb t expected then [] else [problem t]
+  | Some t =>
+      if type_eqb t expected then []
+      else if same_but_limits t expected then [Not_designed_yet List_limits_differ at_]
+      else [problem t]
   | None => []
   end.
 
 (* A call standing where a value goes (D38, D23). *)
 Definition as_value (c : call_check) (at_ : place) : option type * Typed.expression * list diagnostic :=
-  match call_gives c, call_can_fail c with
-  | Gives_value t, false => (Some t, called_value (call_tree c), call_diagnostics c)
-  | Gives_value _, true => (None, stand_in, call_diagnostics c ++ [Refused (Failure_unhandled at_)])
+  match call_gives c, call_failures c with
+  | Gives_value t, [] => (Some t, called_value (call_tree c), call_diagnostics c)
+  | Gives_value _, _ :: _ => (None, stand_in, call_diagnostics c ++ [Refused (Failure_unhandled at_)])
   | Gives_nothing, _ => (None, stand_in, call_diagnostics c ++ [Refused (Gives_nothing_used at_)])
   | Gives_unknown, _ => (None, stand_in, call_diagnostics c)
   end.
@@ -183,7 +219,9 @@ Definition check_piece (s : setting) (p : piece) : Typed.expression * list diagn
       | Some info =>
           match variable_type info with
           | Text => (Typed.Read name, [])
-          | t => (Typed.Text_of t (Typed.Read name), [])
+          | Whole => (Typed.Text_of Whole (Typed.Read name), [])
+          | Bool => (Typed.Text_of Bool (Typed.Read name), [])
+          | _ => (stand_in, [Not_designed_yet Converting at_])
           end
       | None => (stand_in, [Refused (Brace_not_variable name at_)])
       end
@@ -244,7 +282,7 @@ Fixpoint check_pairs (procedure : string) (parameters : list (type * option stri
         end in
       argument_diagnostics a ++ label_problems
         ++ expect (argument_type a) expected
-             (fun found => Refused (Argument_type procedure expected found (argument_at a)))
+             (fun found => Refused (Argument_type procedure expected found (argument_at a))) (argument_at a)
         ++ check_pairs procedure others rest
   | _, _ => []
   end.
@@ -298,6 +336,8 @@ Definition random_backwards (given : list checked_argument) (at_ : place) : list
 Definition gives_of (d : definition) : gives :=
   match definition_returns d with Some t => Gives_value t | None => Gives_nothing end.
 
+Definition failures_of (d : definition) : list string := map fst (definition_failures d).
+
 Definition library_call (which : library) (given : list Typed.expression) (at_ : place) : called :=
   Called (Typed.Library_call which given at_).
 
@@ -306,34 +346,47 @@ Definition check_target (procedure : string) (target : target) (given : list che
   : call_check :=
   match target with
   | Library (Show_message same_line) =>
-      make_call Gives_nothing false (check_against procedure [(Text, None)] given at_ None)
+      make_call Gives_nothing [] (check_against procedure [(Text, None)] given at_ None)
         (library_call (Show_message same_line) (trees given) at_)
   | Convert_to_text =>
       match check_single procedure given at_ with
       (* trace: D22, D153 *)
-      | (Some (Whole, _, tree), d) => make_call (Gives_value Text) false d (Pure (Typed.Text_of Whole tree))
-      | (Some (Bool, _, tree), d) => make_call (Gives_value Text) false d (Pure (Typed.Text_of Bool tree))
+      | (Some (Whole, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Whole tree))
+      | (Some (Bool, _, tree), d) => make_call (Gives_value Text) [] d (Pure (Typed.Text_of Bool tree))
       | (Some (Text, value_at, _), d) => unknown_call (d ++ [Refused (Convert_to_same Text value_at)])
+      | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
       | (None, d) => unknown_call d
       end
   | Library Convert_to_whole =>
       match check_single procedure given at_ with
-      | (Some (Text, _, tree), d) => make_call (Gives_value Whole) true d (library_call Convert_to_whole [tree] at_)
+      | (Some (Text, _, tree), d) =>
+          make_call (Gives_value Whole) ["not_a_whole"] d (library_call Convert_to_whole [tree] at_)
       | (Some (Whole, value_at, _), d) => unknown_call (d ++ [Refused (Convert_to_same Whole value_at)])
-      | (Some (Bool, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
+      | (Some (_, value_at, _), d) => unknown_call (d ++ [Not_designed_yet Converting value_at])
       | (None, d) => unknown_call d
       end
   | Library Ask_for_line =>
-      make_call (Gives_value Text) false (check_against procedure [(Text, None)] given at_ None)
+      make_call (Gives_value Text) [] (check_against procedure [(Text, None)] given at_ None)
         (library_call Ask_for_line (trees given) at_)
   | Library Random_number =>
-      make_call (Gives_value Whole) false
+      make_call (Gives_value Whole) []
         (check_against procedure [(Whole, Some "from"); (Whole, Some "to")] given at_ None
            ++ random_backwards given at_)
         (library_call Random_number (trees given) at_)
+  | Library _ => unknown_call (values_diagnostics given)
   | User d =>
-      make_call (gives_of d) false (check_against procedure (user_parameters d) given at_ (Some (definition_name_at d)))
+      make_call (gives_of d) (failures_of d)
+        (check_against procedure (user_parameters d) given at_ (Some (definition_name_at d)))
         (Called (Typed.Procedure_call (procedure_label d) (trees given) at_))
+  end.
+
+(* The types a call's arguments should have, as far as its procedure says, for `[]` and other lists (D76). *)
+Definition expected_arguments (p : program) (name : callee) : list (option type) :=
+  match resolve p name with
+  | Resolved (User d) => map (fun x => Some (fst x)) (user_parameters d)
+  | Resolved (Library (Show_message _)) | Resolved (Library Ask_for_line) => [Some Text]
+  | Resolved (Library Random_number) => [Some Whole; Some Whole]
+  | _ => []
   end.
 
 (* trace: D4, D24, D38, D92, D128 *)
@@ -341,7 +394,8 @@ Definition check_call (s : setting) (name : callee) (given : list checked_argume
   match resolve (setting_program s) name with
   | Unresolved problems =>
       match callee_narrowings name, find_variable (callee_word name) (setting_scope s) with
-      | [], Some _ => unknown_call (values_diagnostics given ++ [Refused (Variable_called (callee_word name) (callee_word_at name))])
+      | [], Some _ =>
+          unknown_call (values_diagnostics given ++ [Refused (Variable_called (callee_word name) (callee_word_at name))])
       | _, _ => unknown_call (problems ++ values_diagnostics given)
       end
   | Resolved target => check_target (callee_name name) target given at_
@@ -356,38 +410,41 @@ Definition chain_problem (e : expression) : list diagnostic :=
 Definition check_step_target (procedure : string) (target : target) (slid : option type) (slid_tree : Typed.expression)
     (given : list checked_argument) (at_ : place) : call_check :=
   let all_trees := slid_tree :: trees given in
-  let one_more (parameters : list (type * option string)) (gives : gives) (can_fail : bool) (tree : called) :=
+  let one_more (parameters : list (type * option string)) (gives : gives) (failures : list string) (tree : called) :=
     match parameters with
     | [] =>
         unknown_call (values_diagnostics given ++ [Refused (Argument_count procedure 0 (S (length given)) at_ None)])
     | (first, _) :: others =>
-        make_call gives can_fail
-          (expect slid first (fun found => Refused (Slid_value_type procedure first found at_))
+        make_call gives failures
+          (expect slid first (fun found => Refused (Slid_value_type procedure first found at_)) at_
              ++ check_against procedure others given at_ None)
           tree
     end in
   match target with
   | Library (Show_message same_line) =>
-      one_more [(Text, None)] Gives_nothing false (library_call (Show_message same_line) all_trees at_)
+      one_more [(Text, None)] Gives_nothing [] (library_call (Show_message same_line) all_trees at_)
   | Convert_to_text =>
       match slid with
       | Some Text => unknown_call (values_diagnostics given ++ [Refused (Convert_to_same Text at_)])
-      | Some Bool => one_more [(Bool, None)] (Gives_value Text) false (Pure (Typed.Text_of Bool slid_tree))
-      | _ => one_more [(Whole, None)] (Gives_value Text) false (Pure (Typed.Text_of Whole slid_tree))
+      | Some Bool => one_more [(Bool, None)] (Gives_value Text) [] (Pure (Typed.Text_of Bool slid_tree))
+      | Some Whole | None => one_more [(Whole, None)] (Gives_value Text) [] (Pure (Typed.Text_of Whole slid_tree))
+      | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
       end
   | Library Convert_to_whole =>
       match slid with
       | Some Whole => unknown_call (values_diagnostics given ++ [Refused (Convert_to_same Whole at_)])
-      | Some Bool => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
-      | _ => one_more [(Text, None)] (Gives_value Whole) true (library_call Convert_to_whole all_trees at_)
+      | Some Text | None =>
+          one_more [(Text, None)] (Gives_value Whole) ["not_a_whole"] (library_call Convert_to_whole all_trees at_)
+      | Some _ => unknown_call (values_diagnostics given ++ [Not_designed_yet Converting at_])
       end
   | Library Ask_for_line =>
-      one_more [(Text, None)] (Gives_value Text) false (library_call Ask_for_line all_trees at_)
+      one_more [(Text, None)] (Gives_value Text) [] (library_call Ask_for_line all_trees at_)
   | Library Random_number =>
-      one_more [(Whole, Some "from"); (Whole, Some "to")] (Gives_value Whole) false
+      one_more [(Whole, Some "from"); (Whole, Some "to")] (Gives_value Whole) []
         (library_call Random_number all_trees at_)
+  | Library _ => unknown_call (values_diagnostics given)
   | User d =>
-      one_more (user_parameters d) (gives_of d) false
+      one_more (user_parameters d) (gives_of d) (failures_of d)
         (Called (Typed.Procedure_call (procedure_label d) all_trees at_))
   end.
 
@@ -402,7 +459,46 @@ Definition check_step (s : setting) (name : callee) (slid : option type) (slid_t
 Definition procedure_named (p : program) (word : string) : bool :=
   is_library_word word || match find_definition p word with Some _ => true | None => false end.
 
-Fixpoint check_expression (s : setting) (e : expression) {struct e}
+Fixpoint argument_count (given : arguments) : Z :=
+  match given with
+  | No_arguments => 0
+  | Argument _ _ rest => 1 + argument_count rest
+  end.
+
+(* trace: D46, D75. A position written as a plain number that no list has, or past an array's length. *)
+Definition plain_position (label : string) (index : expression) (container : type) (at_ : place) : list diagnostic :=
+  match plain_number index with
+  | Some n =>
+      let lowest := if String.eqb label "pos" then 1%Z else 0%Z in
+      let length := match container with Array_of _ l => Some l | _ => None end in
+      let beyond := match length with Some l => (lowest + l <=? n)%Z | None => false end in
+      if (n <? lowest)%Z || beyond then [Refused (Bad_plain_position label n length at_)] else []
+  | None => []
+  end.
+
+(* The failures of a call that the procedure it's in doesn't list, for `?` (D23). *)
+Definition unlisted (s : setting) (failures : list string) : list string :=
+  match setting_failures s with
+  | Some (listed, _) => filter (fun f => negb (existsb (String.eqb f) listed)) failures
+  | None => failures
+  end.
+
+(* trace: D23. `?` after a call: its failures pass up, so its procedure must list them; `proc.main` has no caller. *)
+Definition pass_up_problems (s : setting) (procedure : string) (failures : list string) (at_ : place)
+  : list diagnostic :=
+  match setting_failures s with
+  | None => [Not_designed_yet Failure_leaving_main at_]
+  | Some (_, header_at) =>
+      map (fun f => Refused (Failure_not_listed procedure f at_ header_at)) (unlisted s failures)
+  end.
+
+Definition callee_of_attempt (e : expression) : string :=
+  match e with
+  | Call name _ _ => callee_name name
+  | _ => ""
+  end.
+
+Fixpoint check_expression (s : setting) (expected : option type) (e : expression) {struct e}
   : option type * Typed.expression * list diagnostic :=
   match e with
   | Whole_literal digits at_ =>
@@ -425,14 +521,14 @@ Fixpoint check_expression (s : setting) (e : expression) {struct e}
       if procedure_named (setting_program s) word then (None, stand_in, [Refused (Procedure_without_brackets word at_)])
       else (None, stand_in, [Not_designed_yet Bare_word_not_procedure at_])
   | Negate operand at_ =>
-      let '(t, tree, ds) := check_expression s operand in
+      let '(t, tree, ds) := check_expression s None operand in
       match t with
       | Some Whole => (Some Whole, Typed.Negate tree at_, ds)
       | Some other => (None, stand_in, ds ++ [Refused (Negate_non_number other at_)])
       | None => (None, stand_in, ds)
       end
   | Not operand _ =>
-      let '(t, tree, ds) := check_expression s operand in
+      let '(t, tree, ds) := check_expression s None operand in
       match t with
       | Some Bool => (Some Bool, Typed.Logic_not tree, ds)
       (* trace: D161 *)
@@ -440,53 +536,212 @@ Fixpoint check_expression (s : setting) (e : expression) {struct e}
       | None => (None, stand_in, ds)
       end
   | Binary operator left_operand right_operand operator_at at_ =>
-      let '(a, left_tree, dl) := check_expression s left_operand in
-      let '(b, right_tree, dr) := check_expression s right_operand in
+      let '(a, left_tree, dl) := check_expression s None left_operand in
+      let '(b, right_tree, dr) := check_expression s None right_operand in
       match a, b with
       | Some a', Some b' =>
           let '(t, tree, d) := binary_type operator a' b' left_operand right_operand left_tree right_tree operator_at at_ in
           (t, tree, dl ++ dr ++ d)
       | _, _ => (None, stand_in, dl ++ dr)
       end
-  | Bracketed inner _ => check_expression s inner
+  (* trace: D70, D71, D72 *)
+  | Division way word left_operand right_operand operator_at at_ =>
+      let '(a, left_tree, dl) := check_expression s None left_operand in
+      let '(b, right_tree, dr) := check_expression s None right_operand in
+      match way with
+      | None => (None, stand_in, dl ++ dr ++ [Refused (Bare_division word operator_at)])
+      | Some w =>
+          match a, b with
+          | Some Whole, Some Whole => (Some Whole, Typed.Divide w left_tree right_tree at_, dl ++ dr)
+          | Some a', Some b' => (None, stand_in, dl ++ dr ++ [Refused (Division_types word a' b' operator_at)])
+          | _, _ => (None, stand_in, dl ++ dr)
+          end
+      end
+  (* trace: D75, D76, D167 *)
+  | List_literal items at_ =>
+      let checked := check_list_items s (match expected with Some t => item_of t | None => None end) items in
+      let diagnostics := flat_map argument_diagnostics checked in
+      let count := argument_count items in
+      let first_type := match checked with a :: _ => argument_type a | [] => None end in
+      let item_problems (item : type) :=
+        flat_map (fun a => expect (argument_type a) item (fun found => Refused (Item_type item found (argument_at a)))
+                             (argument_at a)) checked in
+      match expected, checked with
+      | Some (List_of item most), _ =>
+          (Some (List_of item most), Typed.List_literal (List_of item most) (trees checked),
+           diagnostics ++ item_problems item
+             ++ match most with
+                | Some m => if (m <? count)%Z then [Refused (Too_many_items count m at_)] else []
+                | None => []
+                end)
+      | Some (Array_of item length), _ =>
+          (Some (Array_of item length), Typed.List_literal (Array_of item length) (trees checked),
+           diagnostics ++ item_problems item
+             ++ if Z.eqb count length then [] else [Refused (Array_length count length at_)])
+      | Some other, [] => (None, stand_in, [Refused (Empty_list_for other at_)])
+      | _, [] => (None, stand_in, [Not_designed_yet Empty_list_unknown at_])
+      | _, _ =>
+          match first_type with
+          | Some item =>
+              (Some (List_of item None), Typed.List_literal (List_of item None) (trees checked),
+               diagnostics ++ item_problems item)
+          | None => (None, stand_in, diagnostics)
+          end
+      end
+  (* trace: D169 *)
+  | All_literal value at_ =>
+      match expected with
+      | Some (Array_of item length) =>
+          let '(t, tree, d) := check_expression s (Some item) value in
+          (Some (Array_of item length), Typed.All_literal (Array_of item length) tree,
+           d ++ expect t item (fun found => Refused (Item_type item found (expression_at value))) (expression_at value))
+      | _ => let '(_, _, d) := check_expression s None value in (None, stand_in, d ++ [Refused (All_needs_array at_)])
+      end
+  (* trace: D46, D75 *)
+  | Item container label label_at index at_ =>
+      let '(c, container_tree, dc) := check_expression s None container in
+      let '(i, index_tree, di) := check_expression s None index in
+      let label_problems :=
+        if String.eqb label "pos" || String.eqb label "offset" then [] else [Refused (Item_without_label label label_at)] in
+      let index_problems :=
+        match i with
+        | Some Whole | None => []
+        | Some other => [Refused (Position_type other (expression_at index))]
+        end in
+      match c with
+      | Some t =>
+          match item_of t with
+          | Some item =>
+              let problems := label_problems ++ index_problems
+                                ++ (if String.eqb label "pos" || String.eqb label "offset"
+                                    then plain_position label index t (expression_at index) else []) in
+              (match problems with [] => Some item | _ => None end,
+               Typed.Item (String.eqb label "pos") container_tree index_tree at_, dc ++ di ++ problems)
+          | None => (None, stand_in, dc ++ di ++ [Refused (Not_a_list "[ ]" t (expression_at container))])
+          end
+      | None => (None, stand_in, dc ++ di ++ label_problems)
+      end
+  (* trace: D79 *)
+  | Fact value name name_at _ =>
+      let '(t, tree, d) := check_expression s None value in
+      if String.eqb name "len" then
+        match t with
+        | Some t' =>
+            if is_list t' then (Some Whole, Typed.Length tree, d) else (None, stand_in, d ++ [Not_designed_yet Other_facts name_at])
+        | None => (None, stand_in, d)
+        end
+      else (None, stand_in, d ++ [Not_designed_yet Other_facts name_at])
+  (* A method changing a list gives nothing back, so it can't be used as a value (D38, D80). *)
+  | Method _ name name_at _ at_ =>
+      if String.eqb name "add" || String.eqb name "remove" then (None, stand_in, [Refused (Gives_nothing_used at_)])
+      else (None, stand_in, [Not_designed_yet Other_methods name_at])
+  | Range _ at_ => (None, stand_in, [Not_designed_yet Range_elsewhere at_])
+  | Bracketed inner _ => check_expression s expected inner
   | Call name given at_ =>
-      let '(t, tree, d) := as_value (check_call s name (check_arguments s given) at_) at_ in
+      let '(t, tree, d) :=
+        as_value (check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) at_) at_ in
       (t, tree, d ++ chain_problem (Call name given at_))
-  | Fallback attempt fallback operator_at _ =>
-      let '(f, fallback_tree, df) := check_expression s fallback in
+  (* trace: D23 *)
+  | Pass_up attempt operator_at _ =>
       match attempt with
       | Call name given call_at =>
-          let c := check_call s name (check_arguments s given) call_at in
-          let chain := chain_problem (Call name given call_at) in
-          match call_gives c, call_can_fail c, call_tree c with
-          | Gives_value t, true, Called tree =>
-              (Some t, Typed.Fallback tree fallback_tree,
-               call_diagnostics c ++ chain ++ df
-                 ++ expect f t (fun found => Refused (Fallback_type t found (expression_at fallback))))
-          | Gives_unknown, _, _ => (None, stand_in, call_diagnostics c ++ chain ++ df)
-          | _, _, _ =>
-              (None, stand_in, call_diagnostics c ++ chain ++ df ++ [Refused (Fallback_without_failing_call operator_at)])
+          let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+          let chain := chain_problem attempt in
+          match call_gives c, call_failures c, call_tree c with
+          | Gives_value t, _ :: _, Called tree =>
+              (Some t, Typed.Value_of (Typed.Passing tree),
+               call_diagnostics c ++ chain ++ pass_up_problems s (callee_name name) (call_failures c) operator_at)
+          | Gives_nothing, _ :: _, _ => (None, stand_in, call_diagnostics c ++ chain ++ [Refused (Gives_nothing_used call_at)])
+          | Gives_unknown, _, _ => (None, stand_in, call_diagnostics c ++ chain)
+          | _, _, _ => (None, stand_in, call_diagnostics c ++ chain ++ [Refused (Without_failing_call "?" operator_at)])
           end
       | _ =>
-          let '(_, _, da) := check_expression s attempt in
-          (None, stand_in, da ++ df ++ [Refused (Fallback_without_failing_call operator_at)])
+          let '(_, _, da) := check_expression s None attempt in
+          (None, stand_in, da ++ [Refused (Without_failing_call "?" operator_at)])
+      end
+  (* trace: D152 *)
+  | Crash_on_failure attempt operator_at _ =>
+      match attempt with
+      | Call name given call_at =>
+          let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+          let chain := chain_problem attempt in
+          match call_gives c, call_failures c, call_tree c with
+          | Gives_value t, _ :: _, Called tree =>
+              (Some t, Typed.Value_of (Typed.Crashing tree (callee_name name) operator_at), call_diagnostics c ++ chain)
+          | Gives_nothing, _ :: _, _ => (None, stand_in, call_diagnostics c ++ chain ++ [Refused (Gives_nothing_used call_at)])
+          | Gives_unknown, _, _ => (None, stand_in, call_diagnostics c ++ chain)
+          | _, _, _ =>
+              (None, stand_in, call_diagnostics c ++ chain ++ [Refused (Without_failing_call "?? crash" operator_at)])
+          end
+      | _ =>
+          let '(_, _, da) := check_expression s None attempt in
+          (None, stand_in, da ++ [Refused (Without_failing_call "?? crash" operator_at)])
+      end
+  (* trace: D121. `?? ignore` where a value goes. *)
+  | Ignore_failure attempt operator_at _ =>
+      match attempt with
+      | Call name given call_at =>
+          let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+          match call_gives c with
+          | Gives_value t => (None, stand_in, call_diagnostics c ++ [Refused (Ignore_value (callee_name name) t None operator_at)])
+          | Gives_nothing => (None, stand_in, call_diagnostics c ++ [Refused (Gives_nothing_used call_at)])
+          | Gives_unknown => (None, stand_in, call_diagnostics c)
+          end
+      | _ =>
+          let '(_, _, da) := check_expression s None attempt in
+          (None, stand_in, da ++ [Refused (Without_failing_call "?? ignore" operator_at)])
+      end
+  | Fallback attempt fallback operator_at _ =>
+      match attempt with
+      | Call name given call_at =>
+          let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+          let chain := chain_problem (Call name given call_at) in
+          let fallback_expected := match call_gives c with Gives_value t => Some t | _ => None end in
+          let '(f, fallback_tree, df) := check_expression s fallback_expected fallback in
+          match call_gives c, call_failures c, call_tree c with
+          | Gives_value t, _ :: _, Called tree =>
+              (Some t, Typed.Fallback tree fallback_tree,
+               call_diagnostics c ++ chain ++ df
+                 ++ expect f t (fun found => Refused (Fallback_type t found (expression_at fallback))) (expression_at fallback))
+          | Gives_unknown, _, _ => (None, stand_in, call_diagnostics c ++ chain ++ df)
+          | _, _, _ =>
+              (None, stand_in, call_diagnostics c ++ chain ++ df ++ [Refused (Without_failing_call "??" operator_at)])
+          end
+      | _ =>
+          let '(_, _, da) := check_expression s None attempt in
+          let '(_, _, df) := check_expression s None fallback in
+          (None, stand_in, da ++ df ++ [Refused (Without_failing_call "??" operator_at)])
       end
   | Slide start path at_ =>
-      let '(t, start_tree, ds) := check_expression s start in
+      let '(t, start_tree, ds) := check_expression s None start in
       let '(result, tree, dc) := as_value (check_steps s t start_tree path) at_ in
       (result, tree, ds ++ slide_shape start path at_ ++ dc)
   | Broken at_ => (None, stand_in, [Already_refused at_])
   end
 
-(* Checks each argument by its own lights. *)
-with check_arguments (s : setting) (given : arguments) {struct given} : list checked_argument :=
+(* Checks each argument by its own lights, each given the type its parameter has, if known. *)
+with check_arguments (s : setting) (expectations : list (option type)) (given : arguments) {struct given}
+  : list checked_argument :=
   match given with
   | No_arguments => []
   | Argument label value rest =>
-      let '(t, tree, d) := check_expression s value in
+      let '(this, others) := match expectations with x :: xs => (x, xs) | [] => (None, []) end in
+      let '(t, tree, d) := check_expression s this value in
       {| argument_label := label; argument_value := value; argument_type := t; argument_tree := tree;
          argument_diagnostics := d |}
-        :: check_arguments s rest
+        :: check_arguments s others rest
+  end
+
+(* A list's items, each of the type [item] if it's known. *)
+with check_list_items (s : setting) (item : option type) (given : arguments) {struct given}
+  : list checked_argument :=
+  match given with
+  | No_arguments => []
+  | Argument label value rest =>
+      let '(t, tree, d) := check_expression s item value in
+      {| argument_label := label; argument_value := value; argument_type := t; argument_tree := tree;
+         argument_diagnostics := d |}
+        :: check_list_items s item rest
   end
 
 (* A slide's steps, each given the value slid into it as its first argument (D5); gives the last step's call. *)
@@ -495,22 +750,135 @@ with check_steps (s : setting) (slid : option type) (slid_tree : Typed.expressio
   match path with
   | No_steps => unknown_call []
   | Step name _ given at_ rest =>
-      let this := check_step s name slid slid_tree (check_arguments s given) at_ in
+      let expectations := match expected_arguments (setting_program s) name with _ :: xs => xs | [] => [] end in
+      let this := check_step s name slid slid_tree (check_arguments s expectations given) at_ in
       match rest with
       | No_steps => this
       | Step _ _ _ _ _ =>
           let '(next, next_tree, d) := as_value this at_ in
           let later := check_steps s next next_tree rest in
-          make_call (call_gives later) (call_can_fail later) (d ++ call_diagnostics later) (call_tree later)
+          make_call (call_gives later) (call_failures later) (d ++ call_diagnostics later) (call_tree later)
       end
   end.
 
+(* ---------------------------------------------------------------------------------------------------------------- *)
+(* Methods on lists *)
+
+(* What a list method needs: the list's variable, its type, and the call that gives the changed list. *)
+Record method_check := {
+  method_variable : string;
+  method_failures : list string;
+  method_tree : option Typed.call;
+  method_diagnostics : list diagnostic }.
+
+Definition no_method (diagnostics : list diagnostic) : method_check :=
+  {| method_variable := ""; method_failures := []; method_tree := None; method_diagnostics := diagnostics |}.
+
+(* trace: D77, D173. Whether a variable's list may change here: only a `var`'s, and not while a `for each` goes
+   through it. *)
+Definition list_may_change (s : setting) (name : string) (at_ : place) : list diagnostic :=
+  match find_variable name (setting_scope s) with
+  | Some info =>
+      match variable_kind info with
+      | Let_variable => [Refused (List_cannot_change name at_ (variable_keyword_at info) true)]
+      | Parameter_variable => [Refused (List_cannot_change name at_ (variable_name_at info) false)]
+      | Loop_variable => [Refused (Loop_variable_cannot_change name at_ (variable_keyword_at info))]
+      | Var_variable =>
+          match find (fun entry => String.eqb (fst entry) name) (setting_going_through s) with
+          | Some (_, loop_at) => [Refused (Going_through name at_ loop_at)]
+          | None => []
+          end
+      end
+  | None => []
+  end.
+
+(* A position given to `.add` or `.remove`, as `pos: n` or `offset: n` (D80). *)
+Definition position_argument (a : checked_argument) : option bool :=
+  match argument_label a with
+  | Some (label, _) =>
+      if String.eqb label "pos" then Some true else if String.eqb label "offset" then Some false else None
+  | None => None
+  end.
+
+(* trace: D77, D80, D167, D168. `list.add(item)`, `list.add(item, pos: n)` and `list.remove(pos: n)`. *)
+Definition check_method (s : setting) (target : expression) (name : string) (name_at : place) (given : arguments)
+    (at_ : place) : method_check :=
+  match target with
+  | Variable_value variable variable_at =>
+      match find_variable variable (setting_scope s) with
+      | None => no_method [Refused (Unknown_variable variable variable_at (find_ended variable (setting_ended s)))]
+      | Some info =>
+          let t := variable_type info in
+          let change := list_may_change s variable variable_at in
+          let item_expected := item_of t in
+          let checked := check_arguments s [item_expected; Some Whole] given in
+          let ds := values_diagnostics checked in
+          let typed_item (a : checked_argument) (item : type) :=
+            expect (argument_type a) item (fun found => Refused (Argument_type (variable ++ "." ++ name) item found (argument_at a)))
+              (argument_at a) in
+          let typed_position (a : checked_argument) :=
+            match argument_type a with
+            | Some Whole | None => []
+            | Some other => [Refused (Position_type other (argument_at a))]
+            end in
+          let make (failures : list string) (tree : Typed.call) (problems : list diagnostic) :=
+            {| method_variable := variable; method_failures := failures;
+               method_tree := Some tree; method_diagnostics := ds ++ change ++ problems |} in
+          match t with
+          | List_of item most =>
+              if String.eqb name "add" then
+                match checked with
+                | [a] =>
+                    make (full_if most) (Typed.Library_call (Add_item t) [Typed.Read variable; argument_tree a] at_)
+                      (match argument_label a with
+                       | Some (_, label_at) => [Refused (Label_where_none label_at (argument_at a))]
+                       | None => []
+                       end ++ typed_item a item)
+                | [a; position] =>
+                    match position_argument position with
+                    | Some from_one =>
+                        make (full_if most)
+                          (Typed.Library_call (Insert_item t from_one)
+                             [Typed.Read variable; argument_tree a; argument_tree position] at_)
+                          (typed_item a item ++ typed_position position)
+                    | None => no_method (ds ++ [Refused (Item_without_label (match argument_labels [position] with x :: _ => x | [] => "" end) (argument_at position))])
+                    end
+                | _ => no_method (ds ++ [Refused (Argument_count (variable ++ ".add") 1 (length checked) at_ None)])
+                end
+              else if String.eqb name "remove" then
+                match checked with
+                | [position] =>
+                    match position_argument position with
+                    | Some from_one =>
+                        make []
+                          (Typed.Library_call (Remove_item t from_one) [Typed.Read variable; argument_tree position] at_)
+                          (typed_position position)
+                    | None => no_method (ds ++ [Refused (Item_without_label "" (argument_at position))])
+                    end
+                | _ => no_method (ds ++ [Refused (Argument_count (variable ++ ".remove") 1 (length checked) at_ None)])
+                end
+              else no_method (ds ++ [Not_designed_yet Other_methods name_at])
+          | Array_of _ _ =>
+              if String.eqb name "add" || String.eqb name "remove" then
+                no_method (ds ++ [Refused (Array_cannot_grow name name_at)])
+              else no_method (ds ++ [Not_designed_yet Other_methods name_at])
+          | other => no_method (ds ++ [Refused (Not_a_list ("." ++ name) other variable_at)])
+          end
+      end
+  | _ =>
+      let '(_, _, d) := check_expression s None target in
+      no_method (d ++ [Not_designed_yet Method_on_value at_])
+  end.
+
+(* ---------------------------------------------------------------------------------------------------------------- *)
+(* Statements *)
+
 (* A call or a slide standing alone as a statement (D120). *)
 Definition check_run_call (c : call_check) (procedure : string) (at_ : place) : list diagnostic :=
-  match call_gives c, call_can_fail c with
-  | _, true => call_diagnostics c ++ [Refused (Failure_unhandled at_)]
-  | Gives_value t, false => call_diagnostics c ++ [Refused (Value_unused procedure t at_)]
-  | _, false => call_diagnostics c
+  match call_gives c, call_failures c with
+  | _, _ :: _ => call_diagnostics c ++ [Refused (Failure_unhandled at_)]
+  | Gives_value t, [] => call_diagnostics c ++ [Refused (Value_unused procedure t at_)]
+  | _, [] => call_diagnostics c
   end.
 
 Fixpoint last_step_name (path : steps) : string :=
@@ -520,34 +888,103 @@ Fixpoint last_step_name (path : steps) : string :=
   | Step _ _ _ _ rest => last_step_name rest
   end.
 
-(* The statement a call standing alone becomes in the typed tree. *)
-Definition run_tree (c : call_check) : Typed.statement :=
-  match call_tree c with
+(* A stand-in statement for a refused one; it never runs. *)
+Definition stand_in_statement : Typed.statement := Typed.Break.
+
+(* A call standing alone, its failures handled by [handle] (`??`, `?` or `otherwise`, or [None]). *)
+Definition run_tree (c : called) : Typed.statement :=
+  match c with
   | Called tree => Typed.Run tree
-  | _ => Typed.Break
+  | _ => stand_in_statement
+  end.
+
+Definition method_statement (m : method_check) : Typed.statement :=
+  match method_tree m with
+  | Some tree => Typed.Assign (method_variable m) (Typed.Value_of tree)
+  | None => stand_in_statement
   end.
 
 Definition check_run (s : setting) (action : expression) : Typed.statement * list diagnostic :=
   match action with
   | Call name given at_ =>
-      let c := check_call s name (check_arguments s given) at_ in
-      (run_tree c, check_run_call c (callee_name name) at_ ++ chain_problem action)
+      let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) at_ in
+      (run_tree (call_tree c), check_run_call c (callee_name name) at_ ++ chain_problem action)
   | Slide start path at_ =>
-      let '(t, start_tree, ds) := check_expression s start in
+      let '(t, start_tree, ds) := check_expression s None start in
       let c := check_steps s t start_tree path in
-      (run_tree c, ds ++ slide_shape start path at_ ++ check_run_call c (last_step_name path) at_)
+      (run_tree (call_tree c), ds ++ slide_shape start path at_ ++ check_run_call c (last_step_name path) at_)
+  (* trace: D77, D80 *)
+  | Method target name name_at given at_ =>
+      let m := check_method s target name name_at given at_ in
+      (method_statement m,
+       method_diagnostics m ++ match method_failures m with _ :: _ => [Refused (Failure_unhandled at_)] | [] => [] end)
+  (* trace: D23 *)
+  | Pass_up (Call name given call_at) operator_at _ =>
+      let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+      match call_gives c, call_failures c, call_tree c with
+      | Gives_nothing, (_ :: _) as failures, Called tree =>
+          (Typed.Run (Typed.Passing tree), call_diagnostics c ++ pass_up_problems s (callee_name name) failures operator_at)
+      | Gives_value t, _ :: _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Value_unused (callee_name name) t call_at)])
+      | Gives_unknown, _, _ => (stand_in_statement, call_diagnostics c)
+      | _, _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Without_failing_call "?" operator_at)])
+      end
+  | Pass_up (Method target name name_at given at_) operator_at _ =>
+      let m := check_method s target name name_at given at_ in
+      match method_tree m, method_failures m with
+      | Some tree, (_ :: _) as failures =>
+          (Typed.Assign (method_variable m) (Typed.Value_of (Typed.Passing tree)),
+           method_diagnostics m ++ pass_up_problems s ("." ++ name) failures operator_at)
+      | None, _ => (stand_in_statement, method_diagnostics m)
+      | _, [] => (stand_in_statement, method_diagnostics m ++ [Refused (Without_failing_call "?" operator_at)])
+      end
+  (* trace: D152 *)
+  | Crash_on_failure (Call name given call_at) operator_at _ =>
+      let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+      match call_gives c, call_failures c, call_tree c with
+      | Gives_nothing, _ :: _, Called tree =>
+          (Typed.Run (Typed.Crashing tree (callee_name name) operator_at), call_diagnostics c)
+      | Gives_value t, _ :: _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Value_unused (callee_name name) t call_at)])
+      | Gives_unknown, _, _ => (stand_in_statement, call_diagnostics c)
+      | _, _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Without_failing_call "?? crash" operator_at)])
+      end
+  | Crash_on_failure (Method (Variable_value variable _ as target) name name_at given at_) operator_at _ =>
+      let m := check_method s target name name_at given at_ in
+      match method_tree m, method_failures m with
+      | Some tree, _ :: _ =>
+          (Typed.Assign (method_variable m) (Typed.Value_of (Typed.Crashing tree (variable ++ "." ++ name) operator_at)),
+           method_diagnostics m)
+      | None, _ => (stand_in_statement, method_diagnostics m)
+      | _, [] => (stand_in_statement, method_diagnostics m ++ [Refused (Without_failing_call "?? crash" operator_at)])
+      end
+  (* trace: D121 *)
+  | Ignore_failure (Call name given call_at) operator_at _ =>
+      let c := check_call s name (check_arguments s (expected_arguments (setting_program s) name) given) call_at in
+      match call_gives c, call_failures c, call_tree c with
+      | Gives_nothing, _ :: _, Called tree => (Typed.Handle Typed.Nowhere tree Typed.No_cases true, call_diagnostics c)
+      | Gives_value t, _ :: _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Value_unused (callee_name name) t call_at)])
+      | Gives_unknown, _, _ => (stand_in_statement, call_diagnostics c)
+      | _, _, _ => (stand_in_statement, call_diagnostics c ++ [Refused (Without_failing_call "?? ignore" operator_at)])
+      end
+  | Ignore_failure (Method target name name_at given at_) operator_at _ =>
+      let m := check_method s target name name_at given at_ in
+      match method_tree m, method_failures m with
+      | Some tree, _ :: _ =>
+          (Typed.Handle (Typed.Into (method_variable m)) tree Typed.No_cases true, method_diagnostics m)
+      | None, _ => (stand_in_statement, method_diagnostics m)
+      | _, [] => (stand_in_statement, method_diagnostics m ++ [Refused (Without_failing_call "?? ignore" operator_at)])
+      end
   | Fallback (Call name _ _) _ _ at_ =>
-      let '(t, _, ds) := check_expression s action in
-      (Typed.Break,
+      let '(t, _, ds) := check_expression s None action in
+      (stand_in_statement,
        match t with
        | Some t' => ds ++ [Refused (Value_unused (callee_name name) t' at_)]
        | None => ds
        end)
-  | Broken at_ => (Typed.Break, [Already_refused at_])
+  | Broken at_ => (stand_in_statement, [Already_refused at_])
   (* trace: D161. A line that only works out a value; a refused one has had its say already (D55). *)
   | _ =>
-      let '(t, _, ds) := check_expression s action in
-      (Typed.Break,
+      let '(t, _, ds) := check_expression s None action in
+      (stand_in_statement,
        ds ++ [match t with
               | Some t' => Refused (Value_only_line (expression_at action) t')
               | None => Already_refused (expression_at action)
@@ -556,7 +993,7 @@ Definition check_run (s : setting) (action : expression) : Typed.statement * lis
 
 (* trace: D33, D187. A condition, for `if` and `while`, is a `Bool`. *)
 Definition check_condition (s : setting) (condition : expression) : Typed.expression * list diagnostic :=
-  let '(t, tree, ds) := check_expression s condition in
+  let '(t, tree, ds) := check_expression s None condition in
   match t with
   | Some Bool | None => (tree, ds)
   | Some other => (tree, ds ++ [Refused (Condition_not_bool other (expression_at condition))])
@@ -569,8 +1006,14 @@ Fixpoint can_leave (in_inner_loop : bool) (st : statement) : bool :=
   | Return _ _ => true
   | Break _ => negb in_inner_loop
   | If _ then_part rest _ => can_leave_block in_inner_loop then_part || can_leave_else in_inner_loop rest
-  | While _ body _ => can_leave_block true body
+  | While _ body _ | For_each _ _ _ _ _ body _ => can_leave_block true body
+  | Handled _ handlers _ _ => can_leave_cases in_inner_loop handlers
   | _ => false
+  end
+with can_leave_cases (in_inner_loop : bool) (handlers : cases) : bool :=
+  match handlers with
+  | No_cases => false
+  | Case _ _ body _ rest => can_leave_block in_inner_loop body || can_leave_cases in_inner_loop rest
   end
 with can_leave_block (in_inner_loop : bool) (b : block) : bool :=
   match b with
@@ -589,6 +1032,7 @@ Definition follows (st next : statement) : list diagnostic :=
   match st with
   | Return _ at_ => [Refused (After_leaving true (statement_at next) at_)]
   | Break at_ => [Refused (After_leaving false (statement_at next) at_)]
+  | Instead _ _ => [Not_designed_yet After_instead (statement_at next)]
   | If _ _ _ at_ => if can_leave false st then [Refused (After_if_that_leaves (statement_at next) at_)] else []
   | _ => []
   end.
@@ -613,12 +1057,32 @@ with always_returns_else (e : else_part) : bool :=
   | Else_if _ body rest _ => always_returns_block body && always_returns_else rest
   end.
 
+(* Whether every way through a case ends in `instead`, `return` or `break`, so none falls off its end (D40). *)
+Fixpoint always_ends_case (st : statement) : bool :=
+  match st with
+  | Return _ _ | Break _ | Instead _ _ => true
+  | If _ then_part rest _ => always_ends_case_block then_part && always_ends_case_else rest
+  | _ => false
+  end
+with always_ends_case_block (b : block) : bool :=
+  match b with
+  | Empty => false
+  | Then st Empty => always_ends_case st
+  | Then _ rest => always_ends_case_block rest
+  end
+with always_ends_case_else (e : else_part) : bool :=
+  match e with
+  | No_else => false
+  | Else body _ => always_ends_case_block body
+  | Else_if _ body rest _ => always_ends_case_block body && always_ends_case_else rest
+  end.
+
 Definition declare (s : setting) (info : variable_info) : setting := with_scope s (info :: setting_scope s).
 
 (* The names a block declared, for D93's `because:` once it's ended. *)
 Definition declared_in (st : statement) : list (string * place) :=
   match st with
-  | Declare _ name name_at _ _ _ _ => [(name, name_at)]
+  | Declare _ name name_at _ _ _ _ | Handled (Declare _ name name_at _ _ _ _) _ _ _ => [(name, name_at)]
   | _ => []
   end.
 
@@ -629,32 +1093,91 @@ Definition procedure_name_taken (p : program) (name : string) (at_ : place) : li
   | None => if is_library_word name then [Refused (Name_is_procedure name at_ None)] else []
   end.
 
+(* trace: D94. A new variable's name: not in use, and not a procedure's. *)
+Definition new_name (s : setting) (name : string) (at_ : place) : list diagnostic :=
+  match find_variable name (setting_scope s) with
+  | Some info => [Refused (Name_in_use name at_ (variable_name_at info))]
+  | None => procedure_name_taken (setting_program s) name at_
+  end.
+
+(* trace: D14, D147, D171, D173. Whether a variable may be given a new value here. *)
+Definition may_assign (s : setting) (name : string) (name_at : place) (info : variable_info) : list diagnostic :=
+  match variable_kind info with
+  | Let_variable => [Refused (Let_cannot_change name name_at (variable_keyword_at info))]
+  | Parameter_variable => [Refused (Parameter_cannot_change name name_at (variable_name_at info))]
+  | Loop_variable => [Refused (Loop_variable_cannot_change name name_at (variable_keyword_at info))]
+  | Var_variable =>
+      match find (fun entry => String.eqb (fst entry) name) (setting_going_through s) with
+      | Some (_, loop_at) => [Refused (Going_through name name_at loop_at)]
+      | None => []
+      end
+  end.
+
+Fixpoint case_names (handlers : cases) : list (string * place) :=
+  match handlers with
+  | No_cases => []
+  | Case failure failure_at _ _ rest => (failure, failure_at) :: case_names rest
+  end.
+
+(* trace: D40. Every failure the call can give has its case, each once, and none for a failure it can't give. *)
+Definition coverage (procedure : string) (failures : list string) (handlers : cases) (otherwise_at : place)
+  : list diagnostic :=
+  let named := case_names handlers in
+  let missing :=
+    map (fun f => Refused (Case_missing procedure f otherwise_at))
+      (filter (fun f => negb (existsb (fun entry => String.eqb (fst entry) f) named)) failures) in
+  let impossible :=
+    map (fun entry => Refused (Case_not_possible procedure (fst entry) (snd entry)))
+      (filter (fun entry => negb (existsb (String.eqb (fst entry)) failures)) named) in
+  let fix twice (seen : list (string * place)) (rest : list (string * place)) :=
+    match rest with
+    | [] => []
+    | (f, at_) :: more =>
+        match find (fun entry => String.eqb (fst entry) f) seen with
+        | Some (_, first) => [Refused (Case_twice f at_ first)]
+        | None => []
+        end ++ twice ((f, at_) :: seen) more
+    end in
+  missing ++ impossible ++ twice [] named.
+
+(* A handled statement's call, as [check_run]'s, [Declare]'s or [Assign]'s value, before its `otherwise`. *)
+Record attempt_check := {
+  attempt_procedure : string;
+  attempt_gives : gives;
+  attempt_failures : list string;
+  attempt_tree : option Typed.call;
+  attempt_destination : Typed.destination;
+  attempt_setting : setting;
+  attempt_diagnostics : list diagnostic }.
+
 Fixpoint check_statement (s : setting) (st : statement) {struct st} : setting * Typed.statement * list diagnostic :=
   match st with
   | Declare changeable name name_at keyword_at written value _ =>
-      let '(t, tree, ds) := check_expression s value in
-      let in_use :=
-        match find_variable name (setting_scope s) with
-        | Some info => [Refused (Name_in_use name name_at (variable_name_at info))]
-        | None => procedure_name_taken (setting_program s) name name_at
-        end in
-      let mismatch := expect t written (fun found => Refused (Wrong_value_type name written found (expression_at value))) in
+      let '(t, tree, ds) := check_expression s (Some written) value in
+      let mismatch :=
+        expect t written (fun found => Refused (Wrong_value_type name written found (expression_at value))) (expression_at value) in
       let info := {| variable_name := name; variable_type := written;
                      variable_kind := if changeable then Var_variable else Let_variable;
                      variable_name_at := name_at; variable_keyword_at := keyword_at |} in
-      (declare s info, Typed.Declare name written tree, in_use ++ ds ++ mismatch)
+      (* trace: D121. `?? ignore` in a declaration names the variable it would leave with nothing. *)
+      let ds := map (fun d => match d with
+                              | Refused (Ignore_value procedure t None at_) => Refused (Ignore_value procedure t (Some name) at_)
+                              | other => other
+                              end) ds in
+      (declare s info, Typed.Declare name written tree, new_name s name name_at ++ ds ++ mismatch)
   | Assign name name_at value _ _ =>
-      let '(t, tree, ds) := check_expression s value in
+      let expected := match find_variable name (setting_scope s) with Some info => Some (variable_type info) | None => None end in
+      let '(t, tree, ds) := check_expression s expected value in
       let problems :=
         match find_variable name (setting_scope s) with
         | None => [Refused (Unknown_variable name name_at (find_ended name (setting_ended s)))] ++ ds
         | Some info =>
-            match variable_kind info with
-            | Let_variable => [Refused (Let_cannot_change name name_at (variable_keyword_at info))] ++ ds
-            | Parameter_variable => [Refused (Parameter_cannot_change name name_at (variable_name_at info))] ++ ds
-            | Var_variable =>
+            match may_assign s name name_at info with
+            | [] =>
                 ds ++ expect t (variable_type info)
                         (fun found => Refused (Wrong_value_type name (variable_type info) found (expression_at value)))
+                        (expression_at value)
+            | refused => refused ++ ds
             end
         end in
       (s, Typed.Assign name tree, problems)
@@ -677,13 +1200,223 @@ Fixpoint check_statement (s : setting) (st : statement) {struct st} : setting * 
        | None => []
        end)
   | Return (Some value) at_ =>
-      let '(t, tree, ds) := check_expression s value in
+      let '(t, tree, ds) := check_expression s (setting_returns s) value in
       (s, Typed.Return (Some tree),
        match setting_returns s with
-       | Some expected => ds ++ expect t expected (fun _ => Not_designed_yet Return_type_wording (expression_at value))
+       | Some expected =>
+           ds ++ expect t expected (fun _ => Not_designed_yet Return_type_wording (expression_at value)) (expression_at value)
        | None => ds ++ [Refused (Return_value_without_returns (setting_procedure s) at_)]
        end)
-  | Labels _ at_ => (s, Typed.Break, [Refused (Labels_not_first at_)])
+  | Labels _ at_ => (s, stand_in_statement, [Refused (Labels_not_first at_)])
+  (* trace: D77, D80, D173 *)
+  | Set_item name name_at label label_at index value _ at_ =>
+      match find_variable name (setting_scope s) with
+      | None => (s, stand_in_statement, [Refused (Unknown_variable name name_at (find_ended name (setting_ended s)))])
+      | Some info =>
+          let t := variable_type info in
+          let change := list_may_change s name name_at in
+          let '(i, index_tree, di) := check_expression s None index in
+          let label_problems :=
+            if String.eqb label "pos" || String.eqb label "offset" then plain_position label index t (expression_at index)
+            else [Refused (Item_without_label label label_at)] in
+          let index_problems :=
+            match i with
+            | Some Whole | None => []
+            | Some other => [Refused (Position_type other (expression_at index))]
+            end in
+          match item_of t with
+          | Some item =>
+              let '(v, value_tree, dv) := check_expression s (Some item) value in
+              (s,
+               Typed.Assign name
+                 (Typed.Value_of (Typed.Library_call (Replace_item t (String.eqb label "pos"))
+                                    [Typed.Read name; index_tree; value_tree] at_)),
+               change ++ di ++ label_problems ++ index_problems ++ dv
+                 ++ expect v item (fun found => Refused (Item_type item found (expression_at value))) (expression_at value))
+          | None => (s, stand_in_statement, di ++ [Refused (Not_a_list "[ ]" t name_at)])
+          end
+      end
+  (* trace: D170, D171, D172, D173, D174 *)
+  | For_each item item_at position from_one source body at_ =>
+      let names :=
+        new_name s item item_at
+          ++ match position with
+             | Some (i, i_at) => if String.eqb i item then [Refused (Name_in_use i i_at item_at)] else new_name s i i_at
+             | None => []
+             end in
+      let loop_setting (item_type : type) :=
+        let scope :=
+          {| variable_name := item; variable_type := item_type; variable_kind := Loop_variable;
+             variable_name_at := item_at; variable_keyword_at := at_ |}
+          :: match position with
+             | Some (i, i_at) =>
+                 [{| variable_name := i; variable_type := Whole; variable_kind := Loop_variable;
+                     variable_name_at := i_at; variable_keyword_at := at_ |}]
+             | None => []
+             end ++ setting_scope s in
+        let going := match source with
+                     | Variable_value name _ => (name, at_) :: setting_going_through s
+                     | _ => setting_going_through s
+                     end in
+        change_setting s scope (setting_ended s) true going (setting_case s) in
+      let position_name := option_map fst position in
+      let loop_names := (item, item_at) :: match position with Some p => [p] | None => [] end in
+      match source with
+      | Range given range_at =>
+          let checked := check_arguments s [Some Whole; Some Whole; Some Whole] given in
+          let labels := argument_labels checked in
+          let ds := values_diagnostics checked in
+          let whole_value (a : checked_argument) :=
+            expect (argument_type a) Whole (fun found => Refused (Argument_type "range" Whole found (argument_at a)))
+              (argument_at a) in
+          let '(ended_body, body_tree, db) := check_block (loop_setting Whole) body in
+          let finish (first last : checked_argument) (included : bool) (step : option checked_argument) :=
+            let step_tree := match step with Some a => argument_tree a | None => Typed.Whole_literal 1 end in
+            let plain :=
+              match plain_number (argument_value first), plain_number (argument_value last),
+                    match step with Some a => plain_number (argument_value a) | None => Some 1%Z end with
+              | Some a, Some b, Some c =>
+                  if (c =? 0)%Z || ((0 <? c)%Z && (b <? a)%Z) || ((c <? 0)%Z && (a <? b)%Z)
+                  then [Refused (Range_never_ends_plain range_at)] else []
+              | _, _, _ => []
+              end in
+            (with_ended s (ended_body ++ loop_names ++ setting_ended s),
+             Typed.For_range item position_name from_one (argument_tree first) (argument_tree last) included step_tree
+               range_at body_tree,
+             names ++ ds ++ whole_value first ++ whole_value last
+               ++ match step with Some a => whole_value a | None => [] end ++ plain ++ db) in
+          match checked, labels with
+          | [a; b], ["from"; "to"] => finish a b true None
+          | [a; b], ["from"; "before"] => finish a b false None
+          | [a; b; c], ["from"; "to"; "step_by"] => finish a b true (Some c)
+          | [a; b; c], ["from"; "before"; "step_by"] => finish a b false (Some c)
+          | _, _ => (s, stand_in_statement, names ++ ds ++ [Refused (Range_labels range_at)] ++ db)
+          end
+      | _ =>
+          let '(t, source_tree, ds) := check_expression s None source in
+          match t with
+          | Some t' =>
+              match item_of t' with
+              | Some item_type =>
+                  let '(ended_body, body_tree, db) := check_block (loop_setting item_type) body in
+                  (with_ended s (ended_body ++ loop_names ++ setting_ended s),
+                   Typed.For_each item position_name from_one source_tree body_tree, names ++ ds ++ db)
+              | None =>
+                  match t' with
+                  | Text => (s, stand_in_statement, names ++ ds ++ [Not_designed_yet Going_through_text (expression_at source)])
+                  | _ => (s, stand_in_statement, names ++ ds ++ [Refused (For_each_source t' (expression_at source))])
+                  end
+              end
+          | None => (s, stand_in_statement, names ++ ds)
+          end
+      end
+  (* trace: D23, D40, D186 *)
+  | Handled attempt handlers otherwise_at _ =>
+      let checked :=
+        match attempt with
+        | Declare changeable name name_at keyword_at written (Call callee given call_at) _ =>
+            let c := check_call s callee (check_arguments s (expected_arguments (setting_program s) callee) given) call_at in
+            let info := {| variable_name := name; variable_type := written;
+                           variable_kind := if changeable then Var_variable else Let_variable;
+                           variable_name_at := name_at; variable_keyword_at := keyword_at |} in
+            let mismatch :=
+              match call_gives c with
+              | Gives_value t => expect (Some t) written (fun found => Refused (Wrong_value_type name written found call_at)) call_at
+              | Gives_nothing => [Refused (Gives_nothing_used call_at)]
+              | Gives_unknown => []
+              end in
+            {| attempt_procedure := callee_name callee; attempt_gives := call_gives c; attempt_failures := call_failures c;
+               attempt_tree := match call_tree c with Called tree => Some tree | _ => None end;
+               attempt_destination := Typed.Into_new name written; attempt_setting := declare s info;
+               attempt_diagnostics := new_name s name name_at ++ call_diagnostics c ++ mismatch |}
+        | Assign name name_at (Call callee given call_at) _ _ =>
+            let c := check_call s callee (check_arguments s (expected_arguments (setting_program s) callee) given) call_at in
+            let problems :=
+              match find_variable name (setting_scope s) with
+              | None => [Refused (Unknown_variable name name_at (find_ended name (setting_ended s)))]
+              | Some info =>
+                  may_assign s name name_at info
+                    ++ match call_gives c with
+                       | Gives_value t =>
+                           expect (Some t) (variable_type info)
+                             (fun found => Refused (Wrong_value_type name (variable_type info) found call_at)) call_at
+                       | Gives_nothing => [Refused (Gives_nothing_used call_at)]
+                       | Gives_unknown => []
+                       end
+              end in
+            {| attempt_procedure := callee_name callee; attempt_gives := call_gives c; attempt_failures := call_failures c;
+               attempt_tree := match call_tree c with Called tree => Some tree | _ => None end;
+               attempt_destination := Typed.Into name; attempt_setting := s;
+               attempt_diagnostics := call_diagnostics c ++ problems |}
+        | Run (Call callee given call_at) _ =>
+            let c := check_call s callee (check_arguments s (expected_arguments (setting_program s) callee) given) call_at in
+            {| attempt_procedure := callee_name callee; attempt_gives := call_gives c; attempt_failures := call_failures c;
+               attempt_tree := match call_tree c with Called tree => Some tree | _ => None end;
+               attempt_destination := Typed.Nowhere; attempt_setting := s;
+               attempt_diagnostics :=
+                 call_diagnostics c
+                   ++ match call_gives c with
+                      | Gives_value t => [Refused (Value_unused (callee_name callee) t call_at)]
+                      | _ => []
+                      end |}
+        | Run (Method (Variable_value variable _ as target) name name_at given method_at) _ =>
+            let m := check_method s target name name_at given method_at in
+            {| attempt_procedure := variable ++ "." ++ name; attempt_gives := Gives_nothing;
+               attempt_failures := method_failures m; attempt_tree := method_tree m;
+               attempt_destination := Typed.Into (method_variable m); attempt_setting := s;
+               attempt_diagnostics := method_diagnostics m |}
+        | _ =>
+            let '(_, _, ds) := check_statement s attempt in
+            {| attempt_procedure := ""; attempt_gives := Gives_unknown; attempt_failures := [];
+               attempt_tree := None; attempt_destination := Typed.Nowhere; attempt_setting := s;
+               attempt_diagnostics := ds ++ [Refused (Without_failing_call "otherwise" otherwise_at)] |}
+        end in
+      let instead := match attempt_gives checked, attempt_destination checked with
+                     | Gives_value t, _ => Some t
+                     | _, _ => None
+                     end in
+      let '(ended_cases, cases_tree, dcases) :=
+        check_cases (in_case s instead (attempt_procedure checked)) (match instead with Some _ => true | None => false end)
+          handlers in
+      let failing :=
+        match attempt_gives checked, attempt_failures checked with
+        | Gives_unknown, _ => []
+        | _, [] => match attempt_diagnostics checked with
+                   | [] => [Refused (Without_failing_call "otherwise" otherwise_at)]
+                   | _ => []
+                   end
+        | _, failures => coverage (attempt_procedure checked) failures handlers otherwise_at
+        end in
+      (with_ended (attempt_setting checked) (ended_cases ++ setting_ended s),
+       match attempt_tree checked with
+       | Some tree => Typed.Handle (attempt_destination checked) tree cases_tree false
+       | None => stand_in_statement
+       end,
+       attempt_diagnostics checked ++ failing ++ dcases)
+  (* trace: D40, D186 *)
+  | Instead value at_ =>
+      match setting_case s with
+      | None => let '(_, _, ds) := check_expression s None value in (s, stand_in_statement, ds ++ [Refused (Instead_outside_case at_)])
+      | Some (None, procedure) =>
+          let '(_, _, ds) := check_expression s None value in
+          (s, stand_in_statement, ds ++ [Refused (Instead_without_value procedure at_)])
+      | Some (Some t, _) =>
+          let '(v, tree, ds) := check_expression s (Some t) value in
+          (s, Typed.Instead tree,
+           ds ++ expect v t (fun found => Refused (Fallback_type t found (expression_at value))) (expression_at value))
+      end
+  end
+
+(* Checks an `otherwise` block's cases; with [must_end], none may fall off its end (D40, D186). *)
+with check_cases (s : setting) (must_end : bool) (handlers : cases) {struct handlers}
+  : list (string * place) * Typed.cases * list diagnostic :=
+  match handlers with
+  | No_cases => ([], Typed.No_cases, [])
+  | Case failure _ body at_ rest =>
+      let '(ended_body, body_tree, db) := check_block s body in
+      let '(ended_rest, rest_tree, dr) := check_cases s must_end rest in
+      let falls := if must_end && negb (always_ends_case_block body) then [Refused (Case_falls_off at_)] else [] in
+      (ended_body ++ ended_rest, Typed.Case failure body_tree rest_tree, db ++ falls ++ dr)
   end
 
 (* Checks a block's statements in turn; gives back the names it declared, which end with it (D93). *)
@@ -756,12 +1489,18 @@ Definition labels_and_rest (b : block) : option (list label_pair) * block :=
   | _ => (None, b)
   end.
 
-(* trace: D4, D25, D37, D57, D88. A definition's refusals, and its body in the typed tree. *)
+(* trace: D4, D25, D37, D39, D57, D88. A definition's refusals, and its body in the typed tree. *)
 Definition check_definition (p : program) (d : definition) : Typed.block * list diagnostic :=
   let procedure := procedure_label d in
   let start := {| setting_program := p; setting_scope := rev (map parameter_info (definition_parameters d));
                   setting_ended := []; setting_in_loop := false; setting_procedure := procedure;
-                  setting_returns := definition_returns d |} in
+                  setting_returns := definition_returns d;
+                  setting_failures :=
+                    match definition_name d with
+                    | Main => None
+                    | Named _ => Some (failures_of d, definition_name_at d)
+                    end;
+                  setting_going_through := []; setting_case := None |} in
   let (labels_line, rest) := labels_and_rest (definition_body d) in
   let labels_problems :=
     match labels_line with
@@ -829,6 +1568,7 @@ Definition elaborate (p : program) : list diagnostic * Typed.program :=
              [{| Typed.procedure_name := n;
                  Typed.procedure_parameters := map (fun x => (parameter_name x, parameter_type x)) (definition_parameters d);
                  Typed.procedure_gives := definition_returns d;
+                 Typed.procedure_failures := failures_of d;
                  Typed.procedure_body := body |}]
          | Main => []
          end)

@@ -5,7 +5,16 @@
 
 module M = Messages
 
-let type_name = function Core.Whole -> "Whole" | Core.Bool -> "Bool" | Core.Text -> "Text"
+(* A type as it's written (D75, D167). *)
+let rec type_name = function
+  | Core.Whole -> "Whole"
+  | Core.Bool -> "Bool"
+  | Core.Text -> "Text"
+  | Core.List_of (item, None) -> "List<" ^ type_name item ^ ">"
+  | Core.List_of (item, Some most) ->
+      "List<" ^ type_name item ^ ">[len.max: " ^ Core.text_of_whole most ^ "]"
+  | Core.Array_of (item, length) ->
+      "Array<" ^ type_name item ^ ">[len: " ^ Core.text_of_whole length ^ "]"
 
 let operator_name = function
   | Core.Add -> "+"
@@ -49,22 +58,7 @@ let same_type_why = "a value's type has to match where it's used."
 (* ---------------------------------------------------------------------------------------------------------------- *)
 (* D128's fixes (D142): a chain of calls written again as calls, or as one slide. *)
 
-let expression_place (e : Core.expression) : Core.place =
-  match e with
-  | Core.Whole_literal (_, p)
-  | Core.Text_literal (_, p)
-  | Core.Bool_literal (_, p)
-  | Core.Variable_value (_, p)
-  | Core.Bare_word (_, p)
-  | Core.Negate (_, p)
-  | Core.Not (_, p)
-  | Core.Binary (_, _, _, _, p)
-  | Core.Bracketed (_, p)
-  | Core.Call (_, _, p)
-  | Core.Fallback (_, _, _, p)
-  | Core.Slide (_, _, p)
-  | Core.Broken p ->
-      p
+let expression_place (e : Core.expression) : Core.place = Core.expression_at e
 
 (* What's written at a place, on its line. *)
 let written source (p : Core.place) =
@@ -323,9 +317,186 @@ let refusal source (r : Core.refusal) : M.message =
   | Core.Failure_unhandled p ->
       refused p ~what:"this call can fail, and nothing here deals with the failure"
         ~why:"every call that can fail deals with its failure, with `?`, `??` or `otherwise`."
-  | Core.Fallback_without_failing_call p ->
-      refused p ~what:"`??` here doesn't follow a call that can fail"
-        ~why:"`??` deals with the failure of the call right before it."
+  (* trace: D81, D102; the forms for `?`, `?? crash`, `?? ignore` and `otherwise` are drafts. *)
+  | Core.Without_failing_call (word, p) ->
+      refused p
+        ~what:(Printf.sprintf "%s here doesn't follow a call that can fail" (quoted word))
+        ~why:
+          (match word with
+          | "?" -> "`?` passes up the failure of the call right before it."
+          | "otherwise" -> "`otherwise` deals with the failures of the call right before it."
+          | _ ->
+              Printf.sprintf "%s deals with the failure of the call right before it." (quoted word))
+  (* trace: D23. A draft wording. *)
+  | Core.Failure_not_listed (procedure, failure, p, header) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s can fail with %s, which this procedure doesn't list"
+             (quoted procedure) (quoted failure))
+        ~because:("its failures are listed here", Some (at header))
+        ~why:"`?` passes a failure up to the caller, so the procedure lists it after `!`."
+  (* trace: D121 *)
+  | Core.Ignore_value (procedure, given, variable, p) ->
+      refused p
+        ~what:
+          (match variable with
+          | Some v ->
+              Printf.sprintf "%s gives back a %s, so `?? ignore` leaves %s with nothing if it fails"
+                (quoted procedure) (a_type given) (quoted v)
+          | None ->
+              Printf.sprintf
+                "%s gives back a %s, so `?? ignore` leaves nothing to carry on with if it fails"
+                (quoted procedure) (a_type given))
+        ~why:
+          "`?? ignore` is for a call that gives nothing; after one that gives a value, `?? value` \
+           says what to carry on with."
+  (* trace: D40. Drafts. *)
+  | Core.Case_missing (procedure, failure, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s can fail with %s, and no case here deals with it" (quoted procedure)
+             (quoted failure))
+        ~why:"an `otherwise` has a case for every failure its call can give."
+  | Core.Case_not_possible (procedure, failure, p) ->
+      refused p
+        ~what:(Printf.sprintf "%s can't fail with %s" (quoted procedure) (quoted failure))
+        ~why:"an `otherwise` has a case for each failure its call can give, and no others."
+  | Core.Case_twice (failure, p, first) ->
+      refused p
+        ~what:(Printf.sprintf "there's already a case for %s" (quoted failure))
+        ~because:("the first is here", Some (at first))
+        ~why:"each failure has one case."
+  | Core.Case_falls_off p ->
+      refused p ~what:"this case can reach its end without `instead`, `return` or `break`"
+        ~why:
+          "after a call that gives back a value, each case ends with `instead` a value, `return` \
+           or `break`, so there's always a value to carry on with."
+  | Core.Instead_outside_case p ->
+      refused p ~what:"this `instead` isn't in a case of an `otherwise`"
+        ~why:"`instead` gives the value to carry on with when a call fails."
+  | Core.Instead_without_value (procedure, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s gives back nothing, so there's nothing for `instead` to stand for"
+             (quoted procedure))
+        ~why:
+          "`instead` gives the value to carry on with when a call fails; after one that gives \
+           nothing, a case just ends."
+  (* trace: D70, D71, D89 *)
+  | Core.Division_types (word, left, right, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s works on two `Whole`s, but this is a %s and a %s" (quoted word)
+             (a_type left) (a_type right))
+        ~why:"`/`, `div` and `rem` are only for numbers."
+  (* trace: D70, D71. A draft wording. *)
+  | Core.Bare_division (word, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s needs to say how it rounds: %s or %s" (quoted word)
+             (quoted (word ^ ".floor"))
+             (quoted (word ^ ".trunc")))
+        ~why:
+          "`.floor` rounds down and `.trunc` cuts the fraction off; they differ for negative \
+           numbers."
+  (* Lists and arrays: drafts *)
+  | Core.Item_type (item, found, p) ->
+      refused p
+        ~what:(Printf.sprintf "this holds %ss, but this item is a %s" (a_type item) (a_type found))
+        ~why:"a list's items are all of one type."
+  | Core.Too_many_items (count, most, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "this list has %s items, but it holds at most %s"
+             (Core.text_of_whole count) (Core.text_of_whole most))
+        ~why:"`len.max` is the most a list may hold."
+  | Core.Array_length (count, length, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "this has %s items, but the array holds exactly %s"
+             (Core.text_of_whole count) (Core.text_of_whole length))
+        ~why:"an array always holds the number of items its `len:` says."
+  | Core.Empty_list_for (expected, p) ->
+      refused p
+        ~what:(Printf.sprintf "`[]` is an empty list, but a %s goes here" (a_type expected))
+        ~why:same_type_why
+  | Core.All_needs_array p ->
+      refused p ~what:"`[all: …]` goes where an `Array` goes"
+        ~why:
+          "`[all: value]` takes its length from the array's type, and a list's length isn't part \
+           of its type."
+  | Core.Not_a_list (what, found, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s works on a list or an array, but this is a %s" (quoted what)
+             (a_type found))
+        ~why:"only lists and arrays have items."
+  | Core.Item_without_label (label, p) ->
+      refused p
+        ~what:
+          (if label = "" then "an item is reached with `pos:` or `offset:`"
+           else
+             Printf.sprintf "an item is reached with `pos:` or `offset:`, not %s"
+               (quoted (label ^ ":")))
+        ~why:"`pos:` counts from 1 and `offset:` from 0, so the label says which."
+  | Core.Position_type (found, p) ->
+      refused p
+        ~what:(Printf.sprintf "a position is a `Whole`, but this is a %s" (a_type found))
+        ~why:same_type_why
+  | Core.Bad_plain_position (label, index, length, p) ->
+      refused p
+        ~what:
+          (match length with
+          | Some l ->
+              Printf.sprintf "`%s: %s` is past this array's %s items" label
+                (Core.text_of_whole index) (Core.text_of_whole l)
+          | None ->
+              Printf.sprintf "no list has an item at `%s: %s`" label (Core.text_of_whole index))
+        ~why:"`pos:` counts from 1 and `offset:` from 0, up to the list's length."
+  | Core.List_cannot_change (name, p, declared, by_let) ->
+      refused p
+        ~what:(Printf.sprintf "%s can't change" (quoted name))
+        ~because:
+          (if by_let then
+             ( Printf.sprintf "line %d declares it with `let`" declared.place_line,
+               Some (at declared) )
+           else (Printf.sprintf "%s is a parameter" (quoted name), Some (at declared)))
+        ~why:"only a `var`'s value can change, its items included."
+  | Core.Array_cannot_grow (meth, p) ->
+      refused p
+        ~what:(Printf.sprintf "an array has no %s" (quoted ("." ^ meth)))
+        ~why:"an array always holds the same number of items; a `List` can grow and shrink."
+  (* trace: D173. A draft wording. *)
+  | Core.Going_through (name, p, loop_at) ->
+      refused p
+        ~what:
+          (Printf.sprintf "%s can't change here, since this `for each` is going through it"
+             (quoted name))
+        ~because:("the `for each` is here", Some (at loop_at))
+        ~why:
+          "a `for each` can't change the list it's going through; to change it while looping, use \
+           `while`."
+  | Core.Loop_variable_cannot_change (name, p, loop_at) ->
+      refused p
+        ~what:(Printf.sprintf "%s can't be given a new value" (quoted name))
+        ~because:
+          ( Printf.sprintf "the `for each` on line %d gives it each item in turn" loop_at.place_line,
+            Some (at loop_at) )
+        ~why:"a `for each`'s names are new for each pass, like a `let`."
+  | Core.For_each_source (found, p) ->
+      refused p
+        ~what:
+          (Printf.sprintf "`for each` goes through a list, an array or a `range`, but this is a %s"
+             (a_type found))
+        ~why:"`for each` runs its body once for each item."
+  | Core.Range_labels p ->
+      refused p
+        ~what:"`range` takes `from:` and one of `to:` or `before:`, then `step_by:` if it isn't 1"
+        ~why:"`to:` includes its end and `before:` stops short of it."
+  | Core.Range_never_ends_plain p ->
+      refused p ~what:"this `range` never reaches its end"
+        ~why:
+          "a range counts from `from:` toward its end, so `step_by:` points that way, and isn't 0."
   | Core.Missing_label (label, value) ->
       refused value
         ~fix:(M.insert_at (line_of source value) value.place_column (label ^ ": "))
@@ -504,6 +675,17 @@ let not_designed (what : Core.not_designed) =
   | Core.Label_order -> "writing labels in a different order from the parameters"
   | Core.Return_type_wording -> "the message for `return` with a value of the wrong type"
   | Core.Main_returns -> "`proc.main` with `->`"
+  | Core.Empty_list_unknown -> "`[]` where nothing says what type of list it is"
+  | Core.List_limits_differ -> "a list with one `len.max` where a list with another, or none, goes"
+  | Core.Other_facts -> "facts besides a list's `.len`"
+  | Core.Other_methods -> "methods besides a list's `.add` and `.remove`"
+  | Core.Method_on_value ->
+      "a method that changes a value, called on something that isn't a variable"
+  | Core.Range_elsewhere -> "`range[…]` anywhere but in `for each`"
+  | Core.Failure_leaving_main -> "a failure passed up out of `proc.main`"
+  | Core.After_instead -> "a line after `instead` in the same block"
+  | Core.Going_through_text -> "going through text with `for each`"
+  | Core.Comparing_lists -> "comparing lists or arrays"
 
 (* Every core diagnostic as a message; [None] for a part the parser has already refused. *)
 let diagnostic source (d : Core.diagnostic) : M.message option =

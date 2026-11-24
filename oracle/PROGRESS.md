@@ -61,12 +61,12 @@ Each checkpoint ends with something running, committed and pushed.
    resolved, labels put in order, slides turned into calls, text's braces into joins. A small second type checker reads
    that tree, and the evaluator runs it. Type safety is re-proven on the typed tree, which keeps the proof the size of
    the language rather than the size of its messages. The same tests pass.
-3. [ ] **Lists, arrays and loops:** `List<T>`, `List<T>[len.max: n]`, `Array<T>[len: n]`, `[ … ]`, `[]`, `[all: v]`,
+3. [x] **Lists, arrays and loops:** `List<T>`, `List<T>[len.max: n]`, `Array<T>[len: n]`, `[ … ]`, `[]`, `[all: v]`,
    `pos:` and `offset:`, `.len`, `.add`, `.remove`, setting an item, `range[…]` with `step_by:`, `for each` with
    `at pos` and `at offset`, and D173. `/`, `div.floor`, `div.trunc`, `rem.floor`, `rem.trunc` (D70, D71, D72), with
    their checks. Proved: type safety for all of it; dividing and remainders exact.
-4. [ ] **Failures in full:** `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash` (D152, status 5),
-   `otherwise` with `case` and `instead`, D186, handler families, `include`, handler parameters, `.*`; procedure
+4. [ ] **Failures in full:** done with checkpoint 3: `! [ … ]` in headers, `?`, `?? value`, `?? ignore`, `?? crash`
+   (D152, status 5), `otherwise` with `case` and `instead`, D186. Left: handler families, `include`, handler parameters, `.*`; procedure
    families (`fam.proc`, D41); comments (`//`, `///`, `comment` blocks, D74).
 5. [ ] **Floats:** `Float`, literals with `~` (D155, D180), `+ - * /` and `sqrt` with D177's check, comparisons and
    D184, `be.Float`, `be.Whole.floor`/`.trunc`/`.ceil`/`.nearest`/`.nearest.even` (D178), `be.Text` of a `Float`
@@ -93,6 +93,11 @@ Each checkpoint ends with something running, committed and pushed.
 - D8's missing `:` refusal: gone; an opening line ending in `:` is refused instead (D199).
 
 ## Status
+
+2026-11-24, later: checkpoint 3 and most of 4 are done: lists, arrays, `range`, `for each`, dividing, and failures
+(`! [ … ]`, `?`, `??`, `otherwise`, `instead`). Proven: `whole_division_exact`, and type safety for all of it, a failure
+passed up with `?` always being one its procedure lists. 43 of 53 tests pass; the 10 left are floats, and
+`d171_for_each_break`, whose guard clause D9 refuses (sent to the design session).
 
 2026-11-24: checkpoints 1 and 2 are done. The core is now `Syntax.v` (what the parser gives), `Checker.v` (refusals
 and the typed tree), `TypedTree.v` (the typed tree and its second type checker), `Evaluator.v` (runs the typed tree)
@@ -121,11 +126,43 @@ Built with these meanwhile. Batch 1, sent 2026-11-24:
 9. **A variable with a built-in's name, as `let show_msg: Whole = 1;` (D102, D192):** D102's wording with no
    `because:`, since a built-in has no line to show.
 
+Batch 2, sent 2026-11-24 (lists, loops, dividing, failures; each in `Wording.ml` or `ralph.ml`):
+- `?`, `?? crash`, `?? ignore` or `otherwise` after no failing call: D102's `??` wording with the word changed, and
+  `why:` "`?` passes up the failure of the call right before it." / "`otherwise` deals with the failures of the call
+  right before it."
+- `?` passing up a failure its procedure doesn't list: "`load` can fail with `missing`, which this procedure doesn't
+  list", `because:` "its failures are listed here", `why:` "`?` passes a failure up to the caller, so the procedure
+  lists it after `!`." `?` in `proc.main` stops with `NotDesignedYet`.
+- `otherwise`: "`load` can fail with `broken`, and no case here deals with it" / "`load` can't fail with `gone`" /
+  "there's already a case for `x`" / "this case can reach its end without `instead`, `return` or `break`" / "this
+  `instead` isn't in a case of an `otherwise`" / "`bag.add` gives back nothing, so there's nothing for `instead` to
+  stand for".
+- Dividing: a bare `div` or `rem`: "`div` needs to say how it rounds: `div.floor` or `div.trunc`"; runtime "a `Whole`
+  can't be divided by zero" (`when:` `7 div.floor 0`), "7 doesn't divide exactly by 2" (`when:` `7 / 2`, `why:` "`/` is
+  for numbers that divide exactly; `div.floor` and `div.trunc` round.").
+- Lists: an item of the wrong type, too many items for `len.max`, an array written with the wrong count, `[]` where a
+  non-list goes, `[all: …]` on a list, an item reached with no label, a position that isn't a `Whole`, a plain position
+  no list has, `.add` on a `let`, `.add` or `.remove` on an array, an `Array` written without `[len: n]`, and at
+  runtime "this list has no item at `pos: 4`" with `when:` "the list holds 3 items".
+- `for each`: D173's "`players` can't change here, since this `for each` is going through it", a loop's name given a
+  new value, going through a non-list, a `range` with the wrong labels, and "this `range` never reaches its end" at
+  compile time and at runtime (`when:` "from: 10, to: 1, step_by: 1").
+- `NotDesignedYet`: `[]` with nothing saying its type; a list with one `len.max` where another goes; facts besides
+  `.len`; methods besides `.add` and `.remove`; a method on something that isn't a variable; `range` outside `for
+  each`; a line after `instead`; going through text; comparing lists.
+
 Decided wordings brought up to date with later decisions, as `Wording.ml` says: D88's `returns` now reads `->`
 (D190); D87's `otherwise:` reads `otherwise` and D102's `else:` reads `else` (D199); D92's "braces in `.fmt` text" reads
 "braces in text" (D200).
 
 ## Theorem statements sent to the design session
+
+- `whole_division_exact` (core/Whole.v), sent 2026-11-24: for any two whole numbers, `/`, `div.floor`, `div.trunc`,
+  `rem.floor` and `rem.trunc` each give a whole number that fits, exactly the one D70 and D71 describe (spelled out in
+  `divides_as`), or stop: dividing by zero stops, `/` stops when the division isn't exact, and -9223372036854775808
+  divided by -1 stops with the overflow check.
+- `type_safety` widened 2026-11-24 to lists, loops, dividing and failures, statement unchanged; it now also promises a
+  failure passed up with `?` is always one its procedure lists, so none escapes `proc.main`.
 
 - `whole_arithmetic_exact` (core/Whole.v): for any two whole numbers, `+`, `-` and `*` give the mathematically exact
   answer whenever it fits in a `Whole`; when the exact answer is bigger than the largest `Whole` they stop with D46's

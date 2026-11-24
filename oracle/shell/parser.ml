@@ -64,6 +64,8 @@ type state = {
   mutable spread_reported : bool;
   mutable closers : string list;  (** the closers of the blocks open now, innermost first *)
   mutable last_code_line : int;  (** the last line whose indentation was checked *)
+  mutable variables : string list;
+      (** the names declared so far in this procedure, which a `.` or `[` after reads as a value's (D77, D79) *)
 }
 
 (* Every way a statement or expression can fail to read; the problem has already been recorded. *)
@@ -472,18 +474,57 @@ and parse_additive st =
       Ok (Core.Broken (place_of whole), whole)
   | _ -> Ok (first, first_span)
 
+(* trace: D59, D70, D71, D72. `*`, `/`, `div` and `rem`, left to right; `div` and `rem` say how they round. *)
 and parse_multiplicative st =
   let* first, first_span = parse_unary st in
   let rec loop left left_span =
+    let divide (t : token) way word width =
+      let* right, right_span = parse_unary st in
+      let whole = join st left_span right_span in
+      loop
+        (Core.Division
+           ( way,
+             word,
+             left,
+             right,
+             { (place_of_token t) with Core.place_width = width },
+             place_of whole ))
+        whole
+    in
     match peek st with
     | Some t when is_symbol "*" t ->
         advance st;
         let* right, right_span = parse_unary st in
         let whole = join st left_span right_span in
         loop (Core.Binary (Core.Multiply, left, right, place_of_token t, place_of whole)) whole
-    | Some t when is_symbol "/" t || is_word "div" t || is_word "rem" t ->
-        not_built st t "dividing and remainders, `/`, `div` and `rem` (D70, D71),";
-        Error ()
+    | Some t when is_symbol "/" t ->
+        advance st;
+        divide t (Some Core.Divide_exactly) "/" 1
+    | Some ({ kind = Word word; _ } as t) when word = "div" || word = "rem" -> (
+        advance st;
+        match (peek st, peek_ahead st 1) with
+        | Some dot, Some ({ kind = Word n; _ } as nt) when is_symbol "." dot -> (
+            advance st;
+            advance st;
+            let way =
+              match (word, n) with
+              | "div", "floor" -> Some Core.Divide_floor
+              | "div", "trunc" -> Some Core.Divide_trunc
+              | "rem", "floor" -> Some Core.Remainder_floor
+              | "rem", "trunc" -> Some Core.Remainder_trunc
+              | _ -> None
+            in
+            match way with
+            | Some _ -> divide t way (word ^ "." ^ n) (nt.column + nt.width - t.column)
+            | None ->
+                (* trace: D102 *)
+                report st
+                  (M.message M.Refused
+                     (M.point nt.line nt.column nt.width)
+                     ~what:(Printf.sprintf "`%s` has no narrowing `.%s`" word n)
+                     ~why:(Printf.sprintf "`%s`'s narrowings are `.floor` and `.trunc`." word));
+                Error ())
+        | _ -> divide t None word t.width)
     | _ -> Ok (left, left_span)
   in
   loop first first_span
@@ -498,16 +539,30 @@ and parse_unary st =
       Ok (Core.Negate (operand, place_of whole), whole)
   | _ -> parse_postfix st
 
-(* trace: D23, D81. `??` belongs to the call right before it, and takes a single value after it. *)
 and parse_postfix st =
   let* value, value_span = parse_primary st in
+  parse_after st value value_span
+
+(* What may follow a value: `?`, `??` (D23, D81), a method or a fact after `.` (D77, D79), and an item in `[ ]`
+   (D75). *)
+and parse_after st value value_span =
   match peek st with
   | Some t when is_symbol "??" t -> (
       advance st;
       match peek st with
-      | Some u when is_word "ignore" u || is_word "crash" u ->
-          not_built st u "`?? ignore` and `?? crash` (D23, D121)";
-          Error ()
+      | Some u when is_word "ignore" u ->
+          advance st;
+          let whole = join st value_span (span_of u) in
+          Ok
+            ( Core.Ignore_failure (value, place_of (join st (span_of t) (span_of u)), place_of whole),
+              whole )
+      | Some u when is_word "crash" u ->
+          advance st;
+          let whole = join st value_span (span_of u) in
+          Ok
+            ( Core.Crash_on_failure
+                (value, place_of (join st (span_of t) (span_of u)), place_of whole),
+              whole )
       | _ ->
           let* fallback, fallback_span =
             match peek st with
@@ -521,11 +576,39 @@ and parse_postfix st =
           let whole = join st value_span fallback_span in
           Ok (Core.Fallback (value, fallback, place_of_token t, place_of whole), whole))
   | Some t when is_symbol "?" t ->
-      not_built_is st t "passing a failure up with `?` (D23)";
-      Error ()
-  | Some t when is_symbol "." t ->
-      not_built st t "methods and facts after a value, as in `list.len` (D77, D79),";
-      Error ()
+      advance st;
+      let whole = join st value_span (span_of t) in
+      parse_after st (Core.Pass_up (value, place_of_token t, place_of whole)) whole
+  | Some t when is_symbol "." t -> (
+      advance st;
+      match peek st with
+      | Some ({ kind = Word n; _ } as nt) ->
+          advance st;
+          if next_is st (is_symbol "(") then
+            let* given, close = parse_arguments st in
+            let whole = join st value_span close in
+            parse_after st (Core.Method (value, n, place_of_token nt, given, place_of whole)) whole
+          else
+            let whole = join st value_span (span_of nt) in
+            parse_after st (Core.Fact (value, n, place_of_token nt, place_of whole)) whole
+      | _ ->
+          expected st "a method or a fact";
+          Error ())
+  | Some t when is_symbol "[" t ->
+      advance st;
+      let label, label_at =
+        match (peek st, peek_ahead st 1) with
+        | Some ({ kind = Word w; _ } as l), Some colon when is_symbol ":" colon ->
+            advance st;
+            advance st;
+            (w, place_of_token l)
+        | Some u, _ -> ("", place_of_token u)
+        | None, _ -> ("", place_of_token t)
+      in
+      let* index, _ = parse_expression st in
+      let* close = expect_closing st "]" in
+      let whole = join st value_span close in
+      parse_after st (Core.Item (value, label, label_at, index, place_of whole)) whole
   | _ -> Ok (value, value_span)
 
 and parse_primary st =
@@ -560,19 +643,31 @@ and parse_primary st =
       | Word "false" ->
           advance st;
           Ok (Core.Bool_literal (false, place_of_token t), span_of t)
+      (* trace: D170 *)
+      | Word "range" when next_is_after st 1 (is_symbol "[") && not (List.mem "range" st.variables)
+        ->
+          advance st;
+          let* given, close = parse_arguments_until st "]" in
+          let whole = join st (span_of t) close in
+          Ok (Core.Range (given, place_of whole), whole)
+      | Word name when (not (is_keyword name)) && List.mem name st.variables ->
+          advance st;
+          Ok (Core.Variable_value (name, place_of_token t), span_of t)
       | Word name when not (is_keyword name) -> (
           let callee, callee_span = parse_callee st t name in
           if next_is st (is_symbol "(") then
             let* given, close = parse_arguments st in
             let whole = join st callee_span close in
             Ok (Core.Call (callee, given, place_of whole), whole)
-          else if callee.callee_narrowings = [] then
-            Ok (Core.Variable_value (name, place_of_token t), span_of t)
           else
-            match List.rev callee.callee_narrowings with
-            | ("len", _) :: _ ->
-                not_built st t "methods and facts after a value, as in `list.len` (D77, D79),";
-                Error ()
+            match callee.callee_narrowings with
+            | [] -> Ok (Core.Variable_value (name, place_of_token t), span_of t)
+            | [ (n, n_at) ] when not (List.mem name [ "show_msg"; "be"; "ask"; "random"; "sqrt" ])
+              ->
+                Ok
+                  ( Core.Fact
+                      (Core.Variable_value (name, place_of_token t), n, n_at, place_of callee_span),
+                    callee_span )
             | _ -> Ok (Core.Bare_word (name, place_of callee_span), callee_span))
       | Symbol "(" ->
           advance st;
@@ -580,9 +675,21 @@ and parse_primary st =
           let* close = expect_closing st ")" in
           let whole = join st (span_of t) close in
           Ok (Core.Bracketed (inner, place_of whole), whole)
-      | Symbol "[" ->
-          not_built st t "lists, `List<Type>` and `[ ]` (D75),";
-          Error ()
+      (* trace: D75, D76, D169 *)
+      | Symbol "[" -> (
+          match (peek_ahead st 1, peek_ahead st 2) with
+          | Some { kind = Word "all"; _ }, Some colon when is_symbol ":" colon ->
+              advance st;
+              advance st;
+              advance st;
+              let* value, _ = parse_expression st in
+              let* close = expect_closing st "]" in
+              let whole = join st (span_of t) close in
+              Ok (Core.All_literal (value, place_of whole), whole)
+          | _ ->
+              let* items, close = parse_arguments_until st "]" in
+              let whole = join st (span_of t) close in
+              Ok (Core.List_literal (items, place_of whole), whole))
       | Symbol "::" ->
           not_built st t "packages, named with `::` (D64),";
           Error ()
@@ -600,9 +707,13 @@ and expect_closing st symbol =
       Error ()
 
 (* A call's arguments, each with its label if it's written with one (D24). Gives the closing bracket's place. *)
-and parse_arguments st =
+and parse_arguments st = parse_arguments_until st ")"
+
+(* Values separated by commas, each with its label if it has one, up to [close]: a call's `( )`, or a list's or a
+   range's `[ ]` (D24, D75, D170). *)
+and parse_arguments_until st close =
   advance st;
-  if next_is st (is_symbol ")") then
+  if next_is st (is_symbol close) then
     match peek st with
     | Some t ->
         advance st;
@@ -625,13 +736,13 @@ and parse_arguments st =
           advance st;
           loop ((label, value) :: acc)
       | _ ->
-          let* close = expect_closing st ")" in
+          let* closing = expect_closing st close in
           let given =
             List.fold_left
               (fun rest (label, value) -> Core.Argument (label, value, rest))
               Core.No_arguments ((label, value) :: acc)
           in
-          Ok (given, close)
+          Ok (given, closing)
     in
     loop []
 
@@ -778,8 +889,18 @@ let parse_closer st depth wanted =
         skip ()
       end
 
-(* trace: D13, D15, D21, D33, D161 *)
-let parse_type st : Core.type0 parsed =
+(* A whole number written plainly, as a type's setting (D167). *)
+let plain_whole st =
+  match peek st with
+  | Some { kind = Number digits; _ } -> (
+      advance st;
+      match Core.whole_of_literal digits with Some n -> Ok n | None -> Error ())
+  | _ ->
+      expected st "a whole number";
+      Error ()
+
+(* trace: D13, D15, D21, D33, D75, D161, D167 *)
+let rec parse_type st : Core.type0 parsed =
   match peek st with
   | Some { kind = Word "Whole"; _ } ->
       advance st;
@@ -790,9 +911,56 @@ let parse_type st : Core.type0 parsed =
   | Some { kind = Word "Text"; _ } ->
       advance st;
       Ok Core.Text
-  | Some ({ kind = Word ("List" | "Array"); _ } as t) ->
-      not_built st t "lists and arrays, `List<Type>`, `Array<Type>` and `[ ]` (D75, D167),";
-      Error ()
+  | Some ({ kind = Word (("List" | "Array") as which); _ } as t) ->
+      advance st;
+      let* _ = expect_closing st "<" in
+      let* item = parse_type st in
+      let* _ = expect_closing st ">" in
+      let setting name =
+        match (peek st, peek_ahead st 1) with
+        | Some l, Some c when is_word name l && is_symbol ":" c ->
+            advance st;
+            advance st;
+            Ok ()
+        | Some l, Some d when name = "len.max" && is_word "len" l && is_symbol "." d -> (
+            match (peek_ahead st 2, peek_ahead st 3) with
+            | Some m, Some c when is_word "max" m && is_symbol ":" c ->
+                advance st;
+                advance st;
+                advance st;
+                advance st;
+                Ok ()
+            | _ ->
+                expected st "`len.max:`";
+                Error ())
+        | _ ->
+            expected st (Printf.sprintf "`%s:`" name);
+            Error ()
+      in
+      if which = "List" then
+        if next_is st (is_symbol "[") then begin
+          advance st;
+          let* () = setting "len.max" in
+          let* most = plain_whole st in
+          let* _ = expect_closing st "]" in
+          Ok (Core.List_of (item, Some most))
+        end
+        else Ok (Core.List_of (item, None))
+      else if next_is st (is_symbol "[") then begin
+        advance st;
+        let* () = setting "len" in
+        let* length = plain_whole st in
+        let* _ = expect_closing st "]" in
+        Ok (Core.Array_of (item, length))
+      end
+      else begin
+        (* trace: D167. A draft wording. *)
+        report st
+          (M.message M.Refused (M.point t.line t.column t.width)
+             ~what:"an `Array` says how many items it holds, as in `Array<Whole>[len: 4]`"
+             ~why:"an array always holds the same number of items, written in its type.");
+        Error ()
+      end
   | Some ({ kind = Word "Float"; _ } as t) ->
       not_built_is st t "`Float` (D157, D162, D163)";
       Error ()
@@ -882,7 +1050,10 @@ let parse_declaration st (keyword : token) changeable : Core.statement parsed =
         | Ok (value, _) -> value
         | Error () -> Core.Broken (place_of_token keyword)
       in
-      (match value with Core.Broken _ -> skip_statement st | _ -> expect_semicolon st);
+      st.variables <- name :: st.variables;
+      (match value with
+      | Core.Broken _ -> skip_statement st
+      | _ -> if not (next_is st (is_word "otherwise")) then expect_semicolon st);
       Ok
         (Core.Declare
            ( changeable,
@@ -933,7 +1104,9 @@ let rec parse_block st depth : Core.block =
     else
       match peek st with
       | None -> List.rev acc
-      | Some t when is_word "end" t || is_word "else" t -> List.rev acc
+      | Some t when is_word "end" t || is_word "else" t || is_word "case" t || is_word "include" t
+        ->
+          List.rev acc
       | Some t -> (
           begin_line st t depth;
           match parse_statement st t depth with
@@ -946,8 +1119,12 @@ let rec parse_block st depth : Core.block =
 
 and parse_statement st (t : token) depth : Core.statement parsed =
   match t.kind with
-  | Word "let" -> parse_declaration st t false
-  | Word "var" -> parse_declaration st t true
+  | Word "let" ->
+      let* declared = parse_declaration st t false in
+      with_otherwise st depth t declared
+  | Word "var" ->
+      let* declared = parse_declaration st t true in
+      with_otherwise st depth t declared
   | Word "if" -> parse_if st t depth
   | Word "while" ->
       advance st;
@@ -977,13 +1154,42 @@ and parse_statement st (t : token) depth : Core.statement parsed =
         expect_semicolon st;
         Ok (Core.Return (Some value, at))
   | Word "labels" -> parse_labels st t
-  | Word ("otherwise" | "case" | "instead" | "include") ->
-      not_built_is st t "handling failures with `otherwise` (D40, D43)";
+  | Word ("otherwise" | "case" | "include") ->
+      expected st "a statement";
       Error ()
-  | Word "for" ->
-      not_built_is st t "going through a list with `for each` (D171, D174)";
-      st.stopped <- true;
-      Error ()
+  (* trace: D40 *)
+  | Word "instead" ->
+      advance st;
+      let* value, _ = parse_expression st in
+      let at = place_of (statement_span st t) in
+      expect_semicolon st;
+      Ok (Core.Instead (value, at))
+  | Word "for" -> parse_for st t depth
+  (* trace: D80. `list[pos: n] = value;` *)
+  | Word name when List.mem name st.variables && next_is_after st 1 (is_symbol "[") && sets_item st
+    ->
+      advance st;
+      advance st;
+      let label, label_at =
+        match (peek st, peek_ahead st 1) with
+        | Some ({ kind = Word w; _ } as l), Some colon when is_symbol ":" colon ->
+            advance st;
+            advance st;
+            (w, place_of_token l)
+        | Some u, _ -> ("", place_of_token u)
+        | None, _ -> ("", place_of_token t)
+      in
+      let* index, _ = parse_expression st in
+      let* _ = expect_closing st "]" in
+      let operator = peek st in
+      advance st;
+      let* value, _ = parse_expression st in
+      let at = place_of (statement_span st t) in
+      expect_semicolon st;
+      let operator_at =
+        match operator with Some o -> place_of_token o | None -> place_of_token t
+      in
+      Ok (Core.Set_item (name, place_of_token t, label, label_at, index, value, operator_at, at))
   | Word "comment" ->
       not_built st t "block comments, `comment name` (D74),";
       st.stopped <- true;
@@ -996,16 +1202,135 @@ and parse_statement st (t : token) depth : Core.statement parsed =
       advance st;
       let* value, _ = parse_expression st in
       let at = place_of (statement_span st t) in
-      expect_semicolon st;
+      if not (next_is st (is_word "otherwise")) then expect_semicolon st;
       let operator_at =
         match operator with Some o -> place_of_token o | None -> place_of_token t
       in
-      Ok (Core.Assign (name, place_of_token t, value, operator_at, at))
+      with_otherwise st depth t (Core.Assign (name, place_of_token t, value, operator_at, at))
   | _ ->
       let* action, _ = parse_expression st in
       let at = place_of (statement_span st t) in
-      expect_semicolon st;
-      Ok (Core.Run (action, at))
+      if not (next_is st (is_word "otherwise")) then expect_semicolon st;
+      with_otherwise st depth t (Core.Run (action, at))
+
+(* Whether the tokens ahead are `name[…] =`, setting an item (D80). *)
+and sets_item st =
+  let rec scan i depth =
+    match peek_ahead st i with
+    | None -> false
+    | Some u when is_symbol "[" u -> scan (i + 1) (depth + 1)
+    | Some u when is_symbol "]" u ->
+        if depth = 1 then
+          match peek_ahead st (i + 1) with Some e -> is_symbol "=" e | None -> false
+        else scan (i + 1) (depth - 1)
+    | Some u when is_symbol ";" u -> false
+    | Some _ -> scan (i + 1) depth
+  in
+  scan 1 0
+
+(* trace: D23, D40, D186. A statement followed by `otherwise`: its call's failures handled case by case. *)
+and with_otherwise st depth (start : token) attempt : Core.statement parsed =
+  match peek st with
+  | Some o when is_word "otherwise" o -> (
+      advance st;
+      match peek st with
+      | Some h when h.line = o.line ->
+          not_built st h "handler families used with `otherwise`, and `include` (D42, D43, D44),";
+          st.stopped <- true;
+          Error ()
+      | _ ->
+          let at = place_of (statement_span st start) in
+          st.closers <- "end otherwise" :: st.closers;
+          let rec cases acc =
+            if st.stopped then List.rev acc
+            else
+              match peek st with
+              | Some c when is_word "case" c -> (
+                  begin_line st c (depth + 1);
+                  advance st;
+                  match peek st with
+                  | Some ({ kind = Word f; _ } as ft) ->
+                      advance st;
+                      let case_at = place_of (statement_span st c) in
+                      expect_opener_end st;
+                      let body = parse_block st (depth + 2) in
+                      cases ((f, place_of_token ft, body, case_at) :: acc)
+                  | _ ->
+                      expected st "a failure's name";
+                      st.stopped <- true;
+                      List.rev acc)
+              | Some c when is_word "include" c ->
+                  begin_line st c (depth + 1);
+                  not_built st c
+                    "handler families used with `otherwise`, and `include` (D42, D43, D44),";
+                  st.stopped <- true;
+                  List.rev acc
+              | _ -> List.rev acc
+          in
+          let found = cases [] in
+          st.closers <- (match st.closers with _ :: rest -> rest | [] -> []);
+          if not st.stopped then parse_closer st depth "end otherwise";
+          let handlers =
+            List.fold_right
+              (fun (f, f_at, body, case_at) rest -> Core.Case (f, f_at, body, case_at, rest))
+              found Core.No_cases
+          in
+          Ok (Core.Handled (attempt, handlers, place_of_token o, at)))
+  | _ -> Ok attempt
+
+(* trace: D171, D174. `for each item at pos i in source`, its body, and `end for`. *)
+and parse_for st (t : token) depth =
+  advance st;
+  let* () =
+    match peek st with
+    | Some e when is_word "each" e ->
+        advance st;
+        Ok ()
+    | _ ->
+        expected st "`each`";
+        st.stopped <- true;
+        Error ()
+  in
+  let name_of () =
+    match peek st with
+    | Some ({ kind = Word n; _ } as nt) ->
+        advance st;
+        if is_keyword n then keyword_as_name st nt n else check_name st nt n n;
+        st.variables <- n :: st.variables;
+        Ok (n, place_of_token nt)
+    | _ ->
+        expected st "a name";
+        st.stopped <- true;
+        Error ()
+  in
+  let* item, item_at = name_of () in
+  let* position, from_one =
+    match (peek st, peek_ahead st 1) with
+    | Some a, Some { kind = Word (("pos" | "offset") as which); _ } when is_word "at" a ->
+        advance st;
+        advance st;
+        let* i = name_of () in
+        Ok (Some i, which = "pos")
+    | _ -> Ok (None, true)
+  in
+  let* () =
+    match peek st with
+    | Some i when is_word "in" i ->
+        advance st;
+        Ok ()
+    | _ ->
+        expected st "`in`";
+        st.stopped <- true;
+        Error ()
+  in
+  let* source, _ = parse_expression st in
+  let at = place_of (statement_span st t) in
+  expect_opener_end st;
+  st.closers <- "end for" :: st.closers;
+  let body = parse_block st (depth + 1) in
+  st.closers <- (match st.closers with _ :: rest -> rest | [] -> []);
+  if not st.stopped then parse_closer st depth "end for";
+  Ok (Core.For_each (item, item_at, position, from_one, source, body, at))
 
 (* trace: D16, D102. `if`, any number of `else if`, at most one `else:`, and one `end if`. *)
 and parse_if st (t : token) depth =
@@ -1278,11 +1603,49 @@ let parse_definition st (keyword : token) : Core.definition option =
                 match parse_type st with Ok t -> Ok (Some t) | Error () -> Error ())
             | _ -> Ok None
           in
-          (match peek st with
-          | Some f when is_symbol "!" f ->
-              not_built st f "failures listed in a header, `! [ … ]` (D39, D190),";
-              st.stopped <- true
-          | _ -> ());
+          (* trace: D39, D190. The failures it can give, after `!`, in `[ ]`. *)
+          let failures =
+            match peek st with
+            | Some f when is_symbol "!" f -> (
+                advance st;
+                match name with
+                | Core.Main ->
+                    not_designed st f "listing failures on `proc.main`";
+                    st.stopped <- true;
+                    []
+                | Core.Named _ -> (
+                    match peek st with
+                    | Some o when is_symbol "[" o ->
+                        advance st;
+                        let rec names acc =
+                          match peek st with
+                          | Some ({ kind = Word n; _ } as nt) -> (
+                              advance st;
+                              check_name st nt n n;
+                              let acc = (n, place_of_token nt) :: acc in
+                              match peek st with
+                              | Some c when is_symbol "," c ->
+                                  advance st;
+                                  names acc
+                              | Some c when is_symbol "]" c ->
+                                  advance st;
+                                  List.rev acc
+                              | _ ->
+                                  expected st "`]`";
+                                  st.stopped <- true;
+                                  List.rev acc)
+                          | _ ->
+                              expected st "a failure's name";
+                              st.stopped <- true;
+                              List.rev acc
+                        in
+                        names []
+                    | _ ->
+                        expected st "`[`";
+                        st.stopped <- true;
+                        []))
+            | _ -> []
+          in
           match returns with
           | Error () ->
               st.stopped <- true;
@@ -1292,6 +1655,7 @@ let parse_definition st (keyword : token) : Core.definition option =
               if st.stopped then None
               else begin
                 st.closers <- [ closer ];
+                st.variables <- List.map (fun (x : Core.parameter) -> x.parameter_name) parameters;
                 let body = parse_block st 1 in
                 st.closers <- [];
                 if not st.stopped then parse_closer st 0 closer;
@@ -1301,6 +1665,7 @@ let parse_definition st (keyword : token) : Core.definition option =
                     definition_name_at = place_of_token name_token;
                     definition_parameters = parameters;
                     definition_returns = returns;
+                    definition_failures = failures;
                     definition_body = body;
                     definition_at = place_of_token keyword;
                   }
@@ -1401,6 +1766,7 @@ let parse ~file (lines : Lexer.line list) =
       spread_reported = false;
       closers = [];
       last_code_line = 0;
+      variables = [];
     }
   in
   List.iter (fun (_, m) -> Option.iter (report st) m) read;

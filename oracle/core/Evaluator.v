@@ -12,11 +12,14 @@ From Ralph Require Import Syntax Whole Io TypedTree Checker.
 Import ListNotations.
 Import Typed.
 Open Scope list_scope.
+Set Warnings "-register-all".
 
 Inductive value :=
 | Whole_value (n : Z)
 | Bool_value (b : bool)
-| Text_value (t : string).
+| Text_value (t : string)
+(* A list's or an array's items, in order (D75, D167). *)
+| List_value (items : list value).
 
 (* The variables in use and their values, innermost first. *)
 Definition environment := list (string * value).
@@ -43,22 +46,24 @@ Fixpoint assign (name : string) (v : value) (env : environment) : option environ
 Definition restore (before after : environment) : environment :=
   skipn (length after - length before) after.
 
-(* How a statement or block finished: carrying on, leaving the innermost loop with `break` (D32), or leaving the
-   procedure with `return` and maybe a value (D57). *)
+(* How a statement or block finished: carrying on, leaving the innermost loop with `break` (D32), leaving the
+   procedure with `return` and maybe a value (D57), or leaving a case with `instead` and a value (D40). *)
 Inductive flow :=
 | Continue (env : environment)
 | Leave_loop (env : environment)
-| Leave_procedure (result : option value).
+| Leave_procedure (result : option value)
+| Leave_case (env : environment) (result : value).
 
 Definition restore_flow (before : environment) (f : flow) : flow :=
   match f with
   | Continue after => Continue (restore before after)
   | Leave_loop after => Leave_loop (restore before after)
   | Leave_procedure result => Leave_procedure result
+  | Leave_case after result => Leave_case (restore before after) result
   end.
 
-(* What a call gives back: a value, nothing, or a failure (D23). *)
-Inductive outcome := Gave (v : value) | Gave_nothing | Failed.
+(* What a call gives back: a value, nothing, or a failure, by its name (D23, D39). *)
+Inductive outcome := Gave (v : value) | Gave_nothing | Failed (failure : string).
 
 (* trace: D46, D92 *)
 Definition checked_whole {A : Type} (at_ : place) (result : checked) (operation : arithmetic_operation)
@@ -88,7 +93,7 @@ Definition text_of (v : value) : io value :=
   match v with
   | Whole_value n => Done (Text_value (text_of_whole n))
   | Bool_value b => Done (Text_value (if b then "true" else "false")%string)
-  | Text_value _ => Stop Stuck
+  | _ => Stop Stuck
   end.
 
 Fixpoint join_texts (values : list value) : io value :=
@@ -115,14 +120,65 @@ Fixpoint bind_parameters (parameters : list (string * type)) (values : list valu
   | _, _ => None
   end.
 
-(* The library's procedures (chapter 9 and D6, D20, D22, D26, D95, D96, D160). *)
+(* trace: D70, D71, D72 *)
+Definition divide_values (way : division) (a b : value) (at_ : place) : io value :=
+  match a, b with
+  | Whole_value x, Whole_value y =>
+      match whole_divide way x y with
+      | Divided n => Done (Whole_value n)
+      | other => Stop (Division_stopped at_ other way x y)
+      end
+  | _, _ => Stop Stuck
+  end.
+
+(* trace: D46, D75. Where a position written [index], counting from 1 or 0, falls in a list of [length] items,
+   counted from 0, if it's in the list. *)
+Definition offset_of (from_one : bool) (index length : Z) : option nat :=
+  let offset := if from_one then (index - 1)%Z else index in
+  if (0 <=? offset)%Z && (offset <? length)%Z then Some (Z.to_nat offset) else None.
+
+Definition item_at {A : Type} (from_one : bool) (items : list value) (index : Z) (at_ : place) (k : nat -> io A)
+  : io A :=
+  let length := Z.of_nat (List.length items) in
+  match offset_of from_one index length with
+  | Some n => k n
+  | None => Stop (Bad_position at_ index from_one length)
+  end.
+
+(* trace: D80. Where `.add(item, pos: n)` may put an item: anywhere from the first place to just after the last. *)
+Definition insert_offset (from_one : bool) (index length : Z) : option nat :=
+  let offset := if from_one then (index - 1)%Z else index in
+  if (0 <=? offset)%Z && (offset <=? length)%Z then Some (Z.to_nat offset) else None.
+
+Fixpoint replace_nth (n : nat) (v : value) (items : list value) : list value :=
+  match n, items with
+  | O, _ :: rest => v :: rest
+  | S n', x :: rest => x :: replace_nth n' v rest
+  | _, [] => []
+  end.
+
+Fixpoint remove_nth (n : nat) (items : list value) : list value :=
+  match n, items with
+  | O, _ :: rest => rest
+  | S n', x :: rest => x :: remove_nth n' rest
+  | _, [] => []
+  end.
+
+(* trace: D168. Whether a list may grow by one. *)
+Definition has_room (container : type) (items : list value) : bool :=
+  match container with
+  | List_of _ (Some most) => (Z.of_nat (List.length items) <? most)%Z
+  | _ => true
+  end.
+
+(* The library's procedures and list methods (chapter 9 and D6, D20, D22, D26, D80, D95, D96, D160, D168). *)
 Definition apply_library (which : library) (values : list value) (at_ : place) : io outcome :=
   match which, values with
   | Show_message same_line, [Text_value t] => Show t (negb same_line) (fun _ => Done Gave_nothing)
   | Convert_to_whole, [Text_value t] =>
       match whole_of_text t with
       | Some n => Done (Gave (Whole_value n))
-      | None => Done Failed
+      | None => Done (Failed "not_a_whole"%string)
       end
   | Ask_for_line, [Text_value question] =>
       Ask question (fun answer =>
@@ -133,8 +189,38 @@ Definition apply_library (which : library) (values : list value) (at_ : place) :
   | Random_number, [Whole_value low; Whole_value high] =>
       if (low <=? high)%Z then Random low high (fun n => Done (Gave (Whole_value n)))
       else Stop (Random_backwards at_ low high)
+  | Add_item container, [List_value items; item] =>
+      if has_room container items then Done (Gave (List_value (items ++ [item]))) else Done (Failed "full"%string)
+  | Insert_item container from_one, [List_value items; item; Whole_value index] =>
+      match insert_offset from_one index (Z.of_nat (List.length items)) with
+      | Some n =>
+          if has_room container items then Done (Gave (List_value (firstn n items ++ item :: skipn n items)))
+          else Done (Failed "full"%string)
+      | None => Stop (Bad_position at_ index from_one (Z.of_nat (List.length items)))
+      end
+  | Remove_item _ from_one, [List_value items; Whole_value index] =>
+      item_at from_one items index at_ (fun n => Done (Gave (List_value (remove_nth n items))))
+  | Replace_item _ from_one, [List_value items; Whole_value index; item] =>
+      item_at from_one items index at_ (fun n => Done (Gave (List_value (replace_nth n item items))))
   | _, _ => Stop Stuck
   end.
+
+(* trace: D172. A range that can never reach its end: a step of 0, or one pointing away from it. *)
+Definition never_ends (first last step : Z) : bool :=
+  (step =? 0)%Z || ((0 <? step)%Z && (last <? first)%Z) || ((step <? 0)%Z && (first <? last)%Z).
+
+(* Whether counting has gone past a range's end. *)
+Definition past_end (current last step : Z) (included : bool) : bool :=
+  if (0 <? step)%Z then (if included then (last <? current)%Z else (last <=? current)%Z)
+  else (if included then (current <? last)%Z else (current <=? last)%Z).
+
+(* The variables a `for each` makes for one pass (D171, D174). *)
+Definition loop_locals (item : string) (v : value) (position : option string) (from_one : bool) (pass : Z)
+    (env : environment) : environment :=
+  (item, v) :: match position with
+               | Some i => [(i, Whole_value (if from_one then pass + 1 else pass)%Z)]
+               | None => []
+               end ++ env.
 
 (* What a procedure of the program's own gives back, from how its body finished (D37, D38, D57). *)
 Definition procedure_result (d : procedure) (f : flow) : io outcome :=
@@ -143,6 +229,18 @@ Definition procedure_result (d : procedure) (f : flow) : io outcome :=
   | Leave_procedure None, None => Done Gave_nothing
   | Continue _, None => Done Gave_nothing
   | _, _ => Stop Stuck
+  end.
+
+(* Where a handled call's value goes (D40). *)
+Definition deliver (destination : destination) (v : value) (env : environment) : io flow :=
+  match destination with
+  | Into_new name _ => Done (Continue ((name, v) :: env))
+  | Into name =>
+      match assign name v env with
+      | Some env' => Done (Continue env')
+      | None => Stop Stuck
+      end
+  | Nowhere => Stop Stuck
   end.
 
 (* Picks a way by a `Bool`. Each way is given as a function, so the way not taken is never worked out: OCaml, which
@@ -192,6 +290,9 @@ Fixpoint evaluate (fuel : nat) (where_ : frame) (p : list procedure) (env : envi
                   checked_whole at_ (whole_arithmetic operator x y) (Operation_binary x operator y) Whole_value
               | _, _ => Stop Stuck
               end))
+      | Divide way left_operand right_operand at_ =>
+          bind (evaluate fuel' where_ p env left_operand) (fun a =>
+            bind (evaluate fuel' where_ p env right_operand) (fun b => divide_values way a b at_))
       | Compare operator _ left_operand right_operand =>
           bind (evaluate fuel' where_ p env left_operand) (fun a =>
             bind (evaluate fuel' where_ p env right_operand) (fun b => compare_values operator a b))
@@ -211,6 +312,34 @@ Fixpoint evaluate (fuel : nat) (where_ : frame) (p : list procedure) (env : envi
       (* trace: D29, D200 *)
       | Join parts => bind (evaluate_all fuel' where_ p env parts) join_texts
       | Text_of _ operand => bind (evaluate fuel' where_ p env operand) text_of
+      (* trace: D75, D167 *)
+      | List_literal _ items => bind (evaluate_all fuel' where_ p env items) (fun vs => Done (List_value vs))
+      (* trace: D169 *)
+      | All_literal container value =>
+          match container with
+          | Array_of _ length => bind (evaluate fuel' where_ p env value) (fun v => Done (List_value (repeat v (Z.to_nat length))))
+          | _ => Stop Stuck
+          end
+      (* trace: D46, D75 *)
+      | Item from_one container index at_ =>
+          bind (evaluate fuel' where_ p env container) (fun c =>
+            bind (evaluate fuel' where_ p env index) (fun i =>
+              match c, i with
+              | List_value items, Whole_value k =>
+                  item_at from_one items k at_ (fun n =>
+                    match nth_error items n with
+                    | Some v => Done v
+                    | None => Stop Stuck
+                    end)
+              | _, _ => Stop Stuck
+              end))
+      (* trace: D79 *)
+      | Length container =>
+          bind (evaluate fuel' where_ p env container) (fun c =>
+            match c with
+            | List_value items => Done (Whole_value (Z.of_nat (List.length items)))
+            | _ => Stop Stuck
+            end)
       | Value_of c =>
           bind (perform fuel' where_ p env c) (fun o =>
             match o with
@@ -222,7 +351,7 @@ Fixpoint evaluate (fuel : nat) (where_ : frame) (p : list procedure) (env : envi
           bind (perform fuel' where_ p env c) (fun o =>
             match o with
             | Gave v => Done v
-            | Failed => evaluate fuel' where_ p env fallback
+            | Failed _ => evaluate fuel' where_ p env fallback
             | Gave_nothing => Stop Stuck
             end)
       end
@@ -257,6 +386,20 @@ with perform (fuel : nat) (where_ : frame) (p : list procedure) (env : environme
             | Some d => apply fuel' where_ p d values at_
             | None => Stop Stuck
             end)
+      (* trace: D152 *)
+      | Crashing inner name at_ =>
+          bind (perform fuel' where_ p env inner) (fun o =>
+            match o with
+            | Failed failure => Stop (Crashed at_ name failure)
+            | other => Done other
+            end)
+      (* trace: D23 *)
+      | Passing inner =>
+          bind (perform fuel' where_ p env inner) (fun o =>
+            match o with
+            | Failed failure => Stop (Passing_up failure)
+            | other => Done other
+            end)
       end
   end
 
@@ -272,8 +415,11 @@ with apply (fuel : nat) (where_ : frame) (p : list procedure) (d : procedure) (v
           let depth := S (frame_depth where_) in
           if Nat.leb (frame_limit where_) depth then Stop (Calls_too_deep at_ depth (frame_procedure where_))
           else
-            bind (execute_block fuel' (enter where_ (procedure_name d)) p locals (procedure_body d))
-              (procedure_result d)
+            (* trace: D23. A failure passed up inside it is what the call gives back. *)
+            catch_failure
+              (bind (execute_block fuel' (enter where_ (procedure_name d)) p locals (procedure_body d))
+                 (procedure_result d))
+              (fun failure => Done (Failed failure))
       | None => Stop Stuck
       end
   end
@@ -314,14 +460,90 @@ with execute (fuel : nat) (where_ : frame) (p : list procedure) (env : environme
                  match f with
                  | Continue env' => execute fuel' where_ p env' (While condition body)
                  | Leave_loop env' => Done (Continue env')
-                 | Leave_procedure result => Done (Leave_procedure result)
+                 | other => Done other
                  end))
               (fun _ => Done (Continue env)))
+      (* trace: D171, D174 *)
+      | For_each item position from_one source body =>
+          bind (evaluate fuel' where_ p env source) (fun v =>
+            match v with
+            | List_value items => go_through fuel' where_ p env item position from_one body items 0
+            | _ => Stop Stuck
+            end)
+      (* trace: D170, D172 *)
+      | For_range item position from_one first last included step at_ body =>
+          bind (evaluate fuel' where_ p env first) (fun f =>
+            bind (evaluate fuel' where_ p env last) (fun l =>
+              bind (evaluate fuel' where_ p env step) (fun s =>
+                match f, l, s with
+                | Whole_value a, Whole_value b, Whole_value c =>
+                    if never_ends a b c then Stop (Range_never_ends at_ a b included c)
+                    else count_through fuel' where_ p env item position from_one body a b included c 0
+                | _, _, _ => Stop Stuck
+                end)))
       | Break => Done (Leave_loop env)
       (* trace: D57 *)
       | Return None => Done (Leave_procedure None)
       | Return (Some value) => bind (evaluate fuel' where_ p env value) (fun v => Done (Leave_procedure (Some v)))
+      (* trace: D23, D40, D121, D186 *)
+      | Handle destination c handlers ignore =>
+          bind (perform fuel' where_ p env c) (fun o =>
+            match o with
+            | Gave v => deliver destination v env
+            | Gave_nothing => match destination with Nowhere => Done (Continue env) | _ => Stop Stuck end
+            | Failed failure =>
+                match find_case failure handlers with
+                | Some body =>
+                    bind (execute_block fuel' where_ p env body) (fun f =>
+                      match f, destination with
+                      | Leave_case env' v, _ => deliver destination v env'
+                      | Continue _, Into_new _ _ => Stop Stuck
+                      | other, _ => Done other
+                      end)
+                | None => if ignore then Done (Continue env) else Stop Stuck
+                end
+            end)
+      | Instead value => bind (evaluate fuel' where_ p env value) (fun v => Done (Leave_case env v))
       end
+  end
+
+(* One pass of a `for each` per item, until one leaves the loop (D171). *)
+with go_through (fuel : nat) (where_ : frame) (p : list procedure) (env : environment) (item : string)
+    (position : option string) (from_one : bool) (body : block) (items : list value) (pass : Z) {struct fuel}
+  : io flow :=
+  match fuel with
+  | O => Stop Out_of_fuel
+  | S fuel' =>
+      match items with
+      | [] => Done (Continue env)
+      | v :: rest =>
+          bind (execute_block fuel' where_ p (loop_locals item v position from_one pass env) body) (fun f =>
+            match f with
+            | Continue env' => go_through fuel' where_ p (restore env env') item position from_one body rest (pass + 1)
+            | Leave_loop env' => Done (Continue (restore env env'))
+            | other => Done other
+            end)
+      end
+  end
+
+(* One pass of a `for each` per number of a range, until it's past its end or a pass leaves the loop (D170, D172). *)
+with count_through (fuel : nat) (where_ : frame) (p : list procedure) (env : environment) (item : string)
+    (position : option string) (from_one : bool) (body : block) (current last : Z) (included : bool) (step : Z)
+    (pass : Z) {struct fuel} : io flow :=
+  match fuel with
+  | O => Stop Out_of_fuel
+  | S fuel' =>
+      if past_end current last step included then Done (Continue env)
+      else
+        bind (execute_block fuel' where_ p (loop_locals item (Whole_value current) position from_one pass env) body)
+          (fun f =>
+             match f with
+             | Continue env' =>
+                 count_through fuel' where_ p (restore env env') item position from_one body (current + step) last
+                   included step (pass + 1)
+             | Leave_loop env' => Done (Continue (restore env env'))
+             | other => Done other
+             end)
   end
 
 (* Runs a block's statements in turn, until one leaves. *)

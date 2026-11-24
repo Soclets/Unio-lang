@@ -4,19 +4,42 @@
    parser builds this tree; the checker (Checker.v) reads it and gives back the typed tree (TypedTree.v) that the
    evaluator runs. *)
 
-From Stdlib Require Import String List ZArith.
+From Stdlib Require Import String List Bool ZArith.
+From Ralph Require Import Whole.
 
 (* A place in the source: which of the program's files (D64), counted from 0, its line, its first column and how many
    columns it covers, counted from 1. The width is how many `^` a message puts under it (D54). *)
 Record place := { place_file : nat; place_line : nat; place_column : nat; place_width : nat }.
 
-(* The types of the subset (D15, D21, D33). The parser stops with `NotBuiltYet` or `NotDesignedYet` on any other. *)
-Inductive type := Whole | Bool | Text.
+(* Unio's types (D15, D21, D33, D75, D167): a list may say the most it holds (`len.max`), and an array always says how
+   many it holds (`len`). The parser stops with `NotBuiltYet` or `NotDesignedYet` on any other. *)
+Inductive type :=
+| Whole
+| Bool
+| Text
+| List_of (item : type) (most : option Z)
+| Array_of (item : type) (length : Z).
 
-Definition type_eqb (a b : type) : bool :=
+Definition option_Z_eqb (a b : option Z) : bool :=
+  match a, b with
+  | Some x, Some y => Z.eqb x y
+  | None, None => true
+  | _, _ => false
+  end.
+
+Fixpoint type_eqb (a b : type) : bool :=
   match a, b with
   | Whole, Whole | Bool, Bool | Text, Text => true
+  | List_of x m, List_of y n => type_eqb x y && option_Z_eqb m n
+  | Array_of x m, Array_of y n => type_eqb x y && Z.eqb m n
   | _, _ => false
+  end.
+
+(* What a list or an array holds. *)
+Definition item_of (t : type) : option type :=
+  match t with
+  | List_of item _ | Array_of item _ => Some item
+  | _ => None
   end.
 
 (* An operator between two values (D17, D27, D34, D59, D190). *)
@@ -64,6 +87,26 @@ Inductive expression :=
 | Negate (operand : expression) (at_ : place)
 | Not (operand : expression) (at_ : place)
 | Binary (operator : binary_operator) (left right : expression) (operator_at at_ : place)
+(* `/`, `div.floor`, `div.trunc`, `rem.floor`, `rem.trunc` (D70, D71); [way] is [None] for a bare `div` or `rem`,
+   with the word written. *)
+| Division (way : option division) (word : string) (left right : expression) (operator_at at_ : place)
+(* `[a, b, c]` and `[]` (D75, D76): its items, label-less arguments *)
+| List_literal (items : arguments) (at_ : place)
+(* `[all: value]` (D169) *)
+| All_literal (value : expression) (at_ : place)
+(* `list[pos: n]` or `list[offset: n]` (D75); the label as written, "" for none *)
+| Item (container : expression) (label : string) (label_at : place) (index : expression) (at_ : place)
+(* A fact after a value's `.`, as `list.len` (D79) *)
+| Fact (value : expression) (name : string) (name_at at_ : place)
+(* A method called on a value, as `bag.add("Gem")` (D77, D80) *)
+| Method (target : expression) (name : string) (name_at : place) (given : arguments) (at_ : place)
+(* `range[from: a, to: b]` (D170, D172) *)
+| Range (given : arguments) (at_ : place)
+(* `call?` (D23) *)
+| Pass_up (attempt : expression) (operator_at at_ : place)
+(* `call ?? ignore` and `call ?? crash` (D23, D121, D152) *)
+| Ignore_failure (attempt : expression) (operator_at at_ : place)
+| Crash_on_failure (attempt : expression) (operator_at at_ : place)
 (* `( )` around a value (D3). *)
 | Bracketed (inner : expression) (at_ : place)
 | Call (name : callee) (given : arguments) (at_ : place)
@@ -103,6 +146,20 @@ Inductive statement :=
 | Break (at_ : place)
 | Return (value : option expression) (at_ : place)
 | Labels (pairs : list label_pair) (at_ : place)
+(* `list[pos: n] = value;` (D80) *)
+| Set_item (name : string) (name_at : place) (label : string) (label_at : place) (index value : expression)
+    (operator_at at_ : place)
+(* `for each item at pos i in source` (D171, D174): the item's name, the position's if written, whether it counts from
+   1 (`pos`), and what it goes through *)
+| For_each (item : string) (item_at : place) (position : option (string * place)) (from_one : bool)
+    (source : expression) (body : block) (at_ : place)
+(* A statement whose call's failures are handled by an `otherwise` block (D40, D186) *)
+| Handled (attempt : statement) (handlers : cases) (otherwise_at at_ : place)
+(* `instead value;`, in a case (D40) *)
+| Instead (value : expression) (at_ : place)
+with cases :=
+| No_cases
+| Case (failure : string) (failure_at : place) (body : block) (at_ : place) (rest : cases)
 with block :=
 | Empty
 | Then (first : statement) (rest : block)
@@ -125,6 +182,8 @@ Record definition := {
   definition_name_at : place;
   definition_parameters : list parameter;
   definition_returns : option type;
+  (* the failures it lists after `!` (D39, D190) *)
+  definition_failures : list (string * place);
   definition_body : block;
   definition_at : place }.
 
@@ -138,6 +197,7 @@ Scheme expression_mutual := Induction for expression Sort Prop
 Combined Scheme expression_induction from expression_mutual, arguments_mutual, steps_mutual.
 
 Scheme statement_mutual := Induction for statement Sort Prop
+  with cases_mutual := Induction for cases Sort Prop
   with block_mutual := Induction for block Sort Prop
   with else_part_mutual := Induction for else_part Sort Prop.
-Combined Scheme statement_induction from statement_mutual, block_mutual, else_part_mutual.
+Combined Scheme statement_induction from statement_mutual, cases_mutual, block_mutual, else_part_mutual.

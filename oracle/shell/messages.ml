@@ -11,7 +11,7 @@
 
    Every message goes to standard error (D104). *)
 
-type kind = Refused | Check_failed | Not_built_yet | Not_designed_yet
+type kind = Refused | Check_failed | Failed | Not_built_yet | Not_designed_yet
 
 (* Where a message points: a file of the program (D64), counted from 0, a line, and the columns to put `^` under, each
    a first column and a width. *)
@@ -45,6 +45,8 @@ let message ?fix ?what ?when_ ?because ?why kind at = { kind; at; fix; what; whe
 let kind_word = function
   | Refused -> "refused"
   | Check_failed -> "check failed"
+  (* trace: D152 *)
+  | Failed -> "failed"
   | Not_built_yet -> "NotBuiltYet"
   | Not_designed_yet -> "NotDesignedYet"
 

@@ -129,12 +129,15 @@ Definition user_parameters (d : definition) : list (type * option string) :=
 Definition expression_at (e : expression) : place :=
   match e with
   | Whole_literal _ at_ | Text_literal _ at_ | Bool_literal _ at_ | Variable_value _ at_
-  | Bare_word _ at_ | Negate _ at_ | Not _ at_ | Binary _ _ _ _ at_ | Bracketed _ at_ | Call _ _ at_
+  | Bare_word _ at_ | Negate _ at_ | Not _ at_ | Binary _ _ _ _ at_ | Division _ _ _ _ _ at_ | List_literal _ at_
+  | All_literal _ at_ | Item _ _ _ _ at_ | Fact _ _ _ at_ | Method _ _ _ _ at_ | Range _ at_ | Pass_up _ _ at_
+  | Ignore_failure _ _ at_ | Crash_on_failure _ _ at_ | Bracketed _ at_ | Call _ _ at_
   | Fallback _ _ _ at_ | Slide _ _ at_ | Broken at_ => at_
   end.
 
 Definition statement_at (s : statement) : place :=
   match s with
   | Declare _ _ _ _ _ _ at_ | Assign _ _ _ _ at_ | Run _ at_ | If _ _ _ at_ | While _ _ at_ | Break at_
-  | Return _ at_ | Labels _ at_ => at_
+  | Return _ at_ | Labels _ at_ | Set_item _ _ _ _ _ _ _ at_ | For_each _ _ _ _ _ _ at_ | Handled _ _ _ at_
+  | Instead _ at_ => at_
   end.

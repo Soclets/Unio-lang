@@ -46,21 +46,56 @@ let negates tokens index =
   let before = tokens.(index - 1) in
   match before.kind with
   | Symbol s -> List.mem s operators || List.mem s [ "("; "["; ","; ":" ]
-  | Word w -> List.mem w leads_into_value || List.mem w word_operators
+  | Word w -> (
+      List.mem w leads_into_value || List.mem w word_operators
+      (* `div.floor -2`: the narrowing of `div` or `rem` ends an operator (D70, D71) *)
+      || index >= 3
+         && (w = "floor" || w = "trunc")
+         && symbol_is "." tokens.(index - 2)
+         && match tokens.(index - 3).kind with Word ("div" | "rem") -> true | _ -> false)
   | _ -> false
 
-let right_gap tokens index =
+(* trace: D3, D17. Which `<` and `>` on a line are a type's brackets, as in `List<Text>`, rather than comparisons: a
+   `<` right after a type's name, which starts with a capital, and the `>` that closes it. *)
+let type_brackets tokens =
+  let marks = Array.make (Array.length tokens) false in
+  let depth = ref 0 in
+  Array.iteri
+    (fun i t ->
+      match t.kind with
+      | Symbol "<"
+        when i > 0
+             && (match tokens.(i - 1).kind with
+               | Word w -> w <> "" && w.[0] >= 'A' && w.[0] <= 'Z'
+               | _ -> false)
+             && tokens.(i - 1).column + tokens.(i - 1).width = t.column ->
+          marks.(i) <- true;
+          incr depth
+      | Symbol ">" when !depth > 0 ->
+          marks.(i) <- true;
+          decr depth
+      | _ -> ())
+    tokens;
+  marks
+
+let right_gap ?(types = [||]) tokens index =
   let a = tokens.(index) and b = tokens.(index + 1) in
-  let symbol_in list t = match t.kind with Symbol s -> List.mem s list | _ -> false in
-  if symbol_in [ ";"; ","; ")"; "]"; ":"; "." ] b then 0
-  else if symbol_in [ "("; "["; "." ] a then 0
-  else if symbol_is "-" a && negates tokens index then 0
-  else if symbol_is "(" b then
-    match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1
-    (* trace: D165. No space before the `[` after a name or a type. *)
-  else if symbol_is "[" b then
-    match a.kind with Word w when not (Parser.is_keyword w) -> 0 | Dollar _ -> 0 | _ -> 1
-  else 1
+  let type_bracket i = i < Array.length types && types.(i) in
+  if type_bracket index && symbol_is "<" a then 0
+  else if type_bracket (index + 1) then 0
+  else if type_bracket index && symbol_is ">" a && symbol_is "[" b then 0
+  else
+    let symbol_in list t = match t.kind with Symbol s -> List.mem s list | _ -> false in
+    (* trace: D23. `?` touches the call before it. *)
+    if symbol_in [ ";"; ","; ")"; "]"; ":"; "."; "?" ] b then 0
+    else if symbol_in [ "("; "["; "." ] a then 0
+    else if symbol_is "-" a && negates tokens index then 0
+    else if symbol_is "(" b then
+      match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1
+      (* trace: D165. No space before the `[` after a name or a type. *)
+    else if symbol_is "[" b then
+      match a.kind with Word w when not (Parser.is_keyword w) -> 0 | Dollar _ -> 0 | _ -> 1
+    else 1
 
 let quoted t = "`" ^ describe t.kind ^ "`"
 
@@ -114,6 +149,7 @@ let check_line (l : Lexer.line) : M.message option =
   then None
   else
     let tokens = Array.of_list l.tokens in
+    let types = type_brackets tokens in
     let count = Array.length tokens in
     let gap_mistakes =
       List.concat
@@ -122,7 +158,7 @@ let check_line (l : Lexer.line) : M.message option =
              let start = a.column + a.width in
              let width = b.column - start in
              let gap = String.sub text (start - 1) width in
-             let right = right_gap tokens i in
+             let right = right_gap ~types tokens i in
              if gap = String.make right ' ' then []
              else [ { column = start; width; right; before = Some a; after = Some b } ]))
     in

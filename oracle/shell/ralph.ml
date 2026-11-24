@@ -152,6 +152,89 @@ let rec walk files (tree : unit Core.io) =
                 ~why:Wording.random_why;
             ];
           finish 4
+      (* trace: D46, D70, D71, D72. Drafts, but for overflow (D92). *)
+      | Core.Division_stopped (p, why, way, a, b) ->
+          end_open_line ();
+          let symbol =
+            match way with
+            | Core.Divide_exactly -> "/"
+            | Core.Divide_floor -> "div.floor"
+            | Core.Divide_trunc -> "div.trunc"
+            | Core.Remainder_floor -> "rem.floor"
+            | Core.Remainder_trunc -> "rem.trunc"
+          in
+          let when_ =
+            Printf.sprintf "%s %s %s" (Core.text_of_whole a) symbol (Core.text_of_whole b)
+          in
+          let message =
+            match why with
+            | Core.By_zero ->
+                M.message M.Check_failed (Wording.at p) ~what:"a `Whole` can't be divided by zero"
+                  ~when_ ~why:"dividing by zero has no answer."
+            | Core.Not_exact ->
+                M.message M.Check_failed (Wording.at p)
+                  ~what:
+                    (Printf.sprintf "%s doesn't divide exactly by %s" (Core.text_of_whole a)
+                       (Core.text_of_whole b))
+                  ~when_
+                  ~why:"`/` is for numbers that divide exactly; `div.floor` and `div.trunc` round."
+            | Core.Quotient_too_big | Core.Divided _ ->
+                M.message M.Check_failed (Wording.at p) ~what:"the result is too big for a `Whole`"
+                  ~when_
+                  ~why:
+                    "a `Whole` holds whole numbers from -9223372036854775808 to \
+                     9223372036854775807."
+          in
+          print_messages files [ message ];
+          finish 4
+      (* trace: D46, D75. A draft wording. *)
+      | Core.Bad_position (p, index, from_one, length) ->
+          end_open_line ();
+          let label = if from_one then "pos" else "offset" in
+          print_messages files
+            [
+              M.message M.Check_failed (Wording.at p)
+                ~what:
+                  (Printf.sprintf "this list has no item at `%s: %s`" label
+                     (Core.text_of_whole index))
+                ~when_:
+                  (let n = Core.text_of_whole length in
+                   if n = "1" then "the list holds 1 item"
+                   else Printf.sprintf "the list holds %s items" n)
+                ~why:
+                  (if from_one then "`pos:` counts from 1 up to the list's length."
+                   else "`offset:` counts from 0 up to one less than the list's length.");
+            ];
+          finish 4
+      (* trace: D172. A draft wording. *)
+      | Core.Range_never_ends (p, first, last, included, step) ->
+          end_open_line ();
+          print_messages files
+            [
+              M.message M.Check_failed (Wording.at p) ~what:"this `range` never reaches its end"
+                ~when_:
+                  (Printf.sprintf "from: %s, %s: %s, step_by: %s" (Core.text_of_whole first)
+                     (if included then "to" else "before")
+                     (Core.text_of_whole last) (Core.text_of_whole step))
+                ~why:
+                  "a range counts from `from:` toward its end, so `step_by:` points that way, and \
+                   isn't 0.";
+            ];
+          finish 4
+      (* trace: D152 *)
+      | Core.Crashed (p, procedure, failure) ->
+          end_open_line ();
+          print_messages files
+            [
+              M.message M.Failed (Wording.at p)
+                ~what:(Printf.sprintf "`%s` failed with `%s`" procedure failure)
+                ~why:"`?? crash` stops the program when the call before it fails.";
+            ];
+          finish 5
+      | Core.Passing_up _ ->
+          end_open_line ();
+          prerr_string (M.internal_error "a failure passed up out of `proc.main`");
+          finish 7
       | Core.Out_of_fuel ->
           end_open_line ();
           prerr_string (M.internal_error "the program ran more steps than Ralph can count");
