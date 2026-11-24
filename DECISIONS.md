@@ -6192,3 +6192,25 @@ gives every shown value a name.
 
 **Tankun's words.** has code, "Why?", then, asked "Should `&` go, so text is joined only with braces?", the owner
 chose: "yea"
+
+## D202. Braces fill in a `Bool` by itself, as `true` or `false`
+
+2026-11-24.
+
+**Chosen.** A `Bool` in braces becomes text by itself, as a number does (D29), showing `true` or `false`, as
+`be.Text` gives (D153):
+
+```
+let won: Bool = true;
+show_msg("Won: {won}");         // Won: true
+```
+
+**Weighed.**
+- Only numbers filling in, as D29 had it, so a `Bool` is converted first with `be.Text` and named. A line more for
+  each, with nothing gained since D153 already says how a `Bool` shows.
+
+**Why this won.** Braces treat every simple value the same, and since D201 a shown value is often filled into text,
+so the extra line would come up often.
+
+**Tankun's words.** "?", meaning "What?", to the first wording of the question, then, asked "Should braces fill in a `Bool` by itself, as `true` or `false`?", the
+owner chose: "yea"

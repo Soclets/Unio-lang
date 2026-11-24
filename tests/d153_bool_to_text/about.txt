@@ -1,1 +1,1 @@
-be.Text turns a Bool into true or false. D22, D153, D201; standard ch. 7.
+A Bool shows as true or false, in braces by itself and through be.Text. D22, D153, D201, D202; standard ch. 7.

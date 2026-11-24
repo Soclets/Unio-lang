@@ -1,8 +1,7 @@
 proc.main
     let won: Bool = true;
     let lost: Bool = false;
-    let won_text: Text = be.Text(won);
+    show_msg("Won: {won}");
     let lost_text: Text = be.Text(lost);
-    show_msg("Won: {won_text}");
     show_msg("Lost: {lost_text}");
 end proc.main

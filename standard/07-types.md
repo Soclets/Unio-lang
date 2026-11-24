@@ -121,7 +121,8 @@ let line: Text = "{name}: {score}";
 ```
 
 - **Braces hold only a variable's name;** a calculation or a call in them is refused (D29).
-- **A number in braces becomes text by itself** (D29).
+- **A number or a `Bool` in braces becomes text by itself,** a `Bool` as `true` or `false`, as `be.Text` gives
+  (D29, D153, D202).
 - **The text is checked at compile time:** a name in braces that isn't a variable is refused (D29).
 - **A brace to show as it is is written `\{`,** as in `"Type \{help}"`, which shows `Type {help}` (D30, D200).
 
