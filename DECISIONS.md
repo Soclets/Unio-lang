@@ -6269,3 +6269,34 @@ expected, and the wording already decided for the nearest refusal.
 **Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
 one. If you aren't sure, bring it to me." (quoted in D132), then, shown the drafts, Tankun said: "Bro, aren't you
 fucking review them yourself? And give them to me when you're unsure?"
+
+## D205. The wording of the eleventh batch: failures, dividing, lists, `for each` and `range`
+
+2026-11-24.
+
+**Chosen.** Drafted by the oracle session (its `PROGRESS.md`, "Batch 2", has the full list) and reviewed by the design
+session, as Tankun asked for wordings (D132). The main ones:
+
+| Refusal or check | `what:` | `why:` |
+|---|---|---|
+| `?`, `?? crash`, `?? ignore` or `otherwise` after no failing call | D102's `??` sentence with the word swapped | as in "`` `otherwise` deals with the failures of the call right before it. ``" |
+| `?` passing up a failure its procedure doesn't list (D23) | `` `load` can fail with `missing`, which this procedure doesn't list ``, with `because:` "its failures are listed here" | `` `?` passes a failure up to the caller, so the procedure lists it after `!`. `` |
+| a failure no case deals with (D40) | `` `load` can fail with `broken`, and no case here deals with it `` | |
+| a case for a failure the call doesn't have | `` `load` can't fail with `gone` `` | |
+| a case that can reach its end with no value (D40) | `` this case can reach its end without `instead`, `return` or `break` `` | `` after a call that gives back a value, each case ends with `instead` a value, `return` or `break`, so there's always a value to carry on with. `` |
+| a bare `div` (D70) | `` `div` needs to say how it rounds: `div.floor` or `div.trunc` `` | |
+| dividing by zero (D72) | `` a `Whole` can't be divided by zero ``, `when:` as in `7 div.floor 0` | dividing by zero has no answer. |
+| `/` that isn't exact (D70) | `7 doesn't divide exactly by 2`, `when:` `7 / 2` | `` `/` is for numbers that divide exactly; `div.floor` and `div.trunc` round. `` |
+| a position past the end (D75) | `` this list has no item at `pos: 4` ``, `when:` "the list holds 3 items" | `` `pos:` counts from 1 up to the list's length. `` |
+| `pos: 0`, `.add` on an array, a literal of the wrong length for an array, a bare number in `[ ]` (D75, D167) | `` no list has an item at `pos: 0` ``, `` an array has no `.add` ``, "this has 3 items, but the array holds exactly 2", `` an item is reached with `pos:` or `offset:` `` | |
+| changing a list inside its own `for each` (D173) | `` `players` can't change here, since this `for each` is going through it ``, with `because:` "the `for each` is here" | `` a `for each` can't change the list it's going through; to change it while looping, use `while`. `` |
+| a range that never reaches its end (D172) | `` this `range` never reaches its end ``, with `when:` as in "from: 10, to: 1, step_by: 1" when it's found at runtime | `` a range counts from `from:` toward its end, so `step_by:` points that way, and isn't 0. `` |
+
+**Weighed.** Nothing else was weighed: each follows D54's layout and the wording already decided for the nearest
+refusal, and the `for each` one says what D173 itself says to do instead.
+
+**Why this won.** Each says what's wrong and names the rule, as every decided message does.
+
+**Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
+one. If you aren't sure, bring it to me." (quoted in D132), and "Bro, aren't you fucking review them yourself? And give
+them to me when you're unsure?" (quoted in D204).
