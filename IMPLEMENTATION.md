@@ -26,6 +26,12 @@ counts as decided for v2 until Tankun confirms it here and it's logged.
   answers in one message, unless one answer unblocks work that's waiting on it (owner, 2026-11-23).
 - Ask one question at a time, in plain chat text. No question popups, buttons
   or pre-made answers, including in any end-of-turn summary box.
+- End a question on the one option you recommend, as in "X?", with any alternatives in the explanation above it, never
+  "X? Or Y?": Tankun often answers "yea", which can only say yes to one thing (owner, 2026-11-20).
+- A message that's only `?` means "What?": explain the last thing again, more plainly. Only `??` means yes, and only
+  `???` means no. A `?` inside a longer message is an ordinary question mark (owner, 2026-11-23).
+- In code shown to Tankun, a comment goes on its own line above the code it explains, never at the end of a line, where
+  it wraps in a narrow window and reads as another line of code (owner, 2026-11-24).
 - Explain plainly, but keep the real technical words and explain them, as in
   "`i32` (a 32-bit signed integer)". A tiny code example usually beats a
   paragraph.
@@ -38,6 +44,9 @@ counts as decided for v2 until Tankun confirms it here and it's logged.
 - Before proposing anything, search DECISIONS.md and the design so far for
   what's already decided, and build on it. Don't clash with a decision or
   reinvent a feature that already exists.
+- Before saying there's no rule or no way for something, check what Tankun's other projects do: Cyborg's
+  `IMPLEMENTATION.md` and `.claude/settings.json` (`/Users/ts/Cyborg - maybe this time it's fr/`) and Plainly v1's
+  (`/Users/ts/Plainly/`). What worked in one was usually chosen for a reason (owner, 2026-11-20).
 - Use the language's own words. Don't invent a new word in a name when the
   language already has one for that thing.
 - When you got something wrong, say so plainly and fix it.
@@ -205,14 +214,17 @@ It can come later for one small, critical piece if a bug there ever gets through
 
 Owner, 2026-11-20, carrying over Plainly v1's IMPLEMENTATION.md rule 4 (itself from Cyborg's rule 11):
 
-Before prompting a subagent or a new session, a session downloads, as Markdown, the current prompting guide for that
-model, and any other guide it points to for what it doesn't cover itself, whether it says "read" or "see"; if the
-model has no guide of its own, the general prompting best practices. It reads each file itself, in full, and again
-after every compaction (owner, 2026-11-23). Never through a fetch tool's summary, which can drop parts. Delete the downloaded guide once you've read it, so a stale copy is never read in its place. Prompts for
-other sessions are written in `design/` as one copiable block, checked against the guide before they're handed over,
-including how a long-running session keeps going and when it stops. A prompt that's already been pasted is never the
-fix: changes go to that session as a message. A subagent's prompt includes this file's rules, since the hook doesn't
-reach a subagent. Messaging another session isn't prompting, and is written like one colleague talking to another.
+Before writing a prompt for a subagent or a new session, or editing one in `design/`, even only to update decision
+numbers (owner, 2026-11-24), a session downloads, as Markdown, the current prompting guide for that model, and any other
+guide it points to for what it doesn't cover itself, whether it says "read" or "see"; if the model has no guide of its
+own, the general prompting best practices. It reads each file itself, in full, and again after every compaction (owner,
+2026-11-23). Never through a fetch tool's summary, which can drop parts. Delete the downloaded guide once you've read
+it, so a stale copy is never read in its place. Prompts for other sessions are written in `design/` as one copiable
+block, checked against the guide before they're handed over, including how a long-running session keeps going and when
+it stops. Tankun pastes each prompt into its session; a session never sends one, since a message from another session
+doesn't carry Tankun's say-so (owner, 2026-11-24). A prompt that's already been pasted is never the fix: changes go to
+that session as a message. A subagent's prompt includes this file's rules, since the hook doesn't reach a subagent.
+Messaging another session isn't prompting, and is written like one colleague talking to another.
 
 ## Git
 
