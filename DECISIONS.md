@@ -5896,3 +5896,29 @@ side, with and without highlighting. And btw, don't use the logo tool thingy, th
 prompt", "No fucking way, highlighting absolutely blessed my eyes, even without sigil", then, asked "Should `$` go,
 replacing D125, with the `unio` command and docs colouring code?", the owner chose: "yea. But what colors do we use,
 are there a standard?"
+
+## D193. Unio has its own fixed colours, the same in the docs, the `unio` command and its editor theme
+
+2026-11-24.
+
+**Chosen.** Unio's code colours are Unio's own, one fixed set, so the docs, the `unio` command and Unio's editor theme
+show code the same way, and the docs can teach what each colour means:
+- **The `unio` command uses the exact colours** where the terminal can show any colour (24-bit colour), and the nearest
+  of the 16 basic ones where it can't.
+- **They read on dark and light backgrounds,** with a version for each where one set can't do both.
+- **The command colours only what goes to a terminal,** never output going to a file or another program, so the tests
+  compare the same bytes, and nothing when `NO_COLOR` is set.
+
+The colours themselves aren't decided yet.
+
+**Weighed.**
+- Unio naming only the kinds (keyword, variable, procedure and so on, using the Language Server Protocol's standard
+  kinds), with the editor's and the terminal's theme picking the colours, as most languages do. The colours would differ
+  between the docs and each learner's screen, so the docs couldn't teach "names are blue".
+
+**Why this won.** A learner sees the same colour for the same kind in the book, in the command's messages and in
+Unio's editor theme. Other editors may colour differently, and the docs say so once: they still colour by the same kinds.
+
+**Tankun's words.** "That's pretty weird, then how are we gonna teach colors?", then, asked "Should Unio have its own
+fixed colours, the same in the docs, the `unio` command and its editor theme?", the owner chose: "yea. But even fucking
+ISO doesn't have a standard for this shit?"

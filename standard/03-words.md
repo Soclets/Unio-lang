@@ -50,9 +50,15 @@ version of Unio adds a keyword, a program already using that word as a name stop
 variable can't take a procedure's name either, since `roll` and `roll()` would look alike (D94, D192).
 
 Where code is shown, the `unio` command and the docs colour it, so names, keywords, procedures and types look different
-(D192).
+(D192). Unio has its own fixed colours, the same in the docs, the `unio` command and Unio's editor theme, so a learner
+sees the colours the docs teach (D193):
+- **The command uses exact colours** where the terminal can show them, and the nearest of the 16 basic ones where it
+  can't.
+- **They read on dark and light backgrounds,** with a version for each where one set can't do both.
+- **The command colours only what goes to a terminal,** never output going to a file or another program, and nothing
+  when `NO_COLOR` is set.
 
-**Not decided:** which colours, and when the command uses them.
+**Not decided:** the colours themselves.
 
 A name is lowercase English letters `a` to `z`, digits, and `_` between words, starting with
 a letter: `player2`, `hp_max_2`, `roll_dice`. No capitals, and `_` never at the start or end, nor two in a row (D99).
