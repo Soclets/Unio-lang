@@ -2,6 +2,9 @@
 
 ## Keywords
 
+A keyword is a word of Unio's own grammar, like `if`, `let` or `proc`. What comes with every program to be used, like
+`show_msg`, `be` or `.len`, is a built-in instead (chapter 9, D196).
+
 Each keyword has exactly one spelling, the short one: `proc`, never `procedure` (D2). The docs, and error messages,
 teach the full word where a keyword first appears, as in "`proc` is short for procedure" and "`msg` is short for
 message".
@@ -11,7 +14,6 @@ message".
 | `proc` | procedure | D2, D4 |
 | `end` | | D8 |
 | `.main` | | D4 |
-| `.same_line` | | D6 |
 | `let` | | D13 |
 | `var` | variable | D2, D13 |
 | `if`, `else` | | D16 |
@@ -21,18 +23,15 @@ message".
 | `for`, `each`, `in` | | D171 |
 | `true`, `false` | | D33 |
 | `and`, `or`, `not` | | D34 |
-| `be` | | D22 |
 | `ignore`, `crash`, `otherwise`, `case` | | D23, D40 |
 | `instead` | | D40 |
 | `labels`, `as` | | D25, D195 |
-| `.fmt` | format | D2, D29 |
 | `extern`, `.cpp` | external | D2, D36, D131 |
 | `eq`, `not_eq` | equal, not equal | D190 |
 | `return` | | D57 |
 | `fam` | family | D2, D41 |
 | `div`, `.floor`, `.trunc` | divide, truncate | D2, D70 |
 | `rem` | remainder | D2, D71 |
-| `.len` | length | D2, D79 |
 | `handler` | | D42 |
 | `include` | | D43 |
 | `comment` | | D74 |
@@ -64,8 +63,8 @@ The colours are (D194):
 |---|---|---|---|
 | keywords, as in `if`, `let`, `eq` | green, bold | `#859900` | `#687700` |
 | variables and parameters | blue | `#3a95d6` | `#2073ae` |
-| procedures and narrowings, as in `heal`, `show_msg.fmt` | yellow | `#b58900` | `#8b6900` |
-| methods, as in `bag.len` | orange | `#d7744c` | `#c14715` |
+| procedures, built-in ones included, and their narrowings, as in `heal`, `show_msg.fmt`, `be.Whole` | yellow | `#b58900` | `#8b6900` |
+| methods and facts, as in `bag.add(x)`, `bag.len` | orange | `#d7744c` | `#c14715` |
 | types, as in `Whole`, `List<Text>` | pink | `#de66a0` | `#c8337c` |
 | labels, as in `by:` | violet, italic | `#8589ce` | `#6368b4` |
 | text and numbers | cyan | `#2aa198` | `#207c75` |

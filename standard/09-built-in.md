@@ -7,6 +7,16 @@ through `extern.cpp` (D64). The built-in procedures target the terminal: showing
 colours, drawing at a position and clearing the screen, on Windows, macOS and Linux. A GUI, if ever, is a separate
 package (D63). What the terminal part is built on isn't decided since D131 moved the runtime to C++.
 
+The built-ins are (D196):
+- **Procedures:** `show_msg`, with its narrowings `.fmt` (short for format) and `.same_line` (D6, D29); `ask` (D20);
+  `be`, which converts, as in `be.Whole(typed)` (D22); `random` and `sqrt`, below.
+- **Facts:** `.len`, short for length, a list's number of items (D79).
+- **Others:** `range`, below.
+
+They aren't keywords. A variable can't take a built-in procedure's name, as with any procedure's (D94), and they're
+coloured as what they are, so `be.Whole` is a procedure's yellow (D194). The docs teach a short name's full word, as
+for keywords (D2).
+
 ## `range`
 
 A range describes a run of whole numbers, written in `[ ]` since nothing runs (D165, D170):

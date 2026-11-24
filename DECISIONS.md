@@ -5997,3 +5997,35 @@ the brackets rule (D165) covers them. It also matches Seal's `labels [ ]` (Seal 
 **Tankun's words.** "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What
 about the font?" (quoted whole in D194), "You sure with the labels?", "Look at the brackets rule", then, asked "Should
 the `labels` line put its pairs in `[ ]`, replacing D25?", the owner chose: "change"
+
+## D196. Keywords are Unio's grammar words; `be`, `.fmt`, `.same_line` and `.len` are built-ins
+
+2026-11-24.
+
+**Chosen.** Two words for Unio's own names:
+- **A keyword** is a word of Unio's grammar, like `if`, `let`, `proc`, `eq` or `labels`.
+- **A built-in** comes with every program to be used: a procedure like `show_msg`, `ask`, `be`, `random` or `sqrt`,
+  with its narrowings, a fact like `.len`, or `range`. Chapter 9 lists them.
+
+`be` (D22), `.fmt` (D29), `.same_line` (D6) and `.len` (D79) leave the keyword list and become built-ins. What follows:
+- **A built-in is coloured as what it is** (D194): `be.Whole` is a procedure's yellow, with no exception to explain,
+  and `.len` a fact's orange. Chapter 3's colour table now says "methods and facts" where it said "methods", since
+  `.len` is a fact (D79).
+- **`let be: Whole = 1;` is still refused,** now because a variable can't take a procedure's name (D94, D192) rather
+  than because `be` is a keyword. `fmt`, `same_line` and `len` only ever follow a `.`, so they can now be names.
+- **The docs still teach a built-in's full word,** as D2 has them do for keywords: `.fmt` is short for format.
+
+**Weighed.**
+- Keeping them as keywords, with `be` coloured as a procedure anyway. The docs would need a sentence on why a keyword
+  isn't coloured like one, which is the mismatch Tankun pointed out.
+- "Built-in procedures" for the second word. `.len` is a fact and `range` isn't called, so "built-ins" covers them all.
+
+**Why this won.** Each name is what it looks like: a keyword shapes the program, and a built-in is used like anything
+written in Unio, coloured the same way. Chapter 9 was already called "Built in".
+
+**Tankun's words.** "". It's listed as a keyword but coloured as a procedure, so the docs need one sentence on why:
+"be.Whole(x) is called like a procedure,"
+
+so, then we should differentiate keyword vs built-in proc, or use another term", "So, `keywords` and `built-in
+procedures`?", then, asked "Should Unio have keywords and built-ins, with `be`, `.fmt`, `.same_line` and `.len`
+moving to the built-ins?", the owner chose: "yea"
