@@ -1,5 +1,5 @@
 refused: program.unio:1:9, line 1 column 9
- 1 | proc add(a: Whole, b: Whole) -> Whole:
+ 1 | proc add(a: Whole, b: Whole) -> Whole
    |         ^
- fix:     `proc add[a: Whole, b: Whole] -> Whole:`
+ fix:     `proc add[a: Whole, b: Whole] -> Whole`
  why:     a definition writes its parameters in `[ ]`; `( )` calls a procedure.

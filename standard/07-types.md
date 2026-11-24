@@ -192,7 +192,7 @@ infinity nor NaN is ever held:
 
 ```
 var size: Float = 2.0;
-while true:
+while true
     size = size * size;   // stops once the result is too big for a Float
 end while
 ```
@@ -241,7 +241,7 @@ var bag: List<Text>[len.max: 10] = [];
 
 ```
 bag.add("Gem") otherwise:
-    case full:
+    case full
         show_msg("Your bag is full!");
 end otherwise
 ```

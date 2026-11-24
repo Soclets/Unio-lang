@@ -1,13 +1,13 @@
-proc double[n: Whole] -> Whole:
+proc double[n: Whole] -> Whole
     return n * 2;
 end proc double
 
-proc add_to[n: Whole, amount: Whole] -> Whole:
+proc add_to[n: Whole, amount: Whole] -> Whole
     labels [amount as by];
     return n + amount;
 end proc add_to
 
-proc.main:
+proc.main
     let points: Whole = 20;
     points |> double |> be.Text |> show_msg;
     points |> add_to(by: 5) |> double |> be.Text |> show_msg;

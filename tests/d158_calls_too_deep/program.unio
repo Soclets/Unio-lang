@@ -1,7 +1,7 @@
-proc count[n: Whole] -> Whole:
+proc count[n: Whole] -> Whole
     return count(n + 1);
 end proc count
 
-proc.main:
+proc.main
     0 |> count |> be.Text |> show_msg;
 end proc.main

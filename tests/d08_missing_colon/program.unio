@@ -1,3 +1,0 @@
-proc.main
-    show_msg("Hi");
-end proc.main

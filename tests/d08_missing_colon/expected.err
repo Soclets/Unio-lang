@@ -1,5 +1,0 @@
-refused: program.unio:1:10, line 1 column 10
- 1 | proc.main
-   |          ^
- fix:     `proc.main:`
- why:     a block's opening line ends with `:`.

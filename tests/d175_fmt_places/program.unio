@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let speed: Float = ~0.1 + ~0.2;
     show_msg.fmt("Speed: {speed, places: 2}");
     show_msg.fmt("{speed, places: 0}");

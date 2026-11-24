@@ -18,13 +18,13 @@ happened; this standard says what the rules are today (D12).
 ## Chapters
 
 1. [Terms](01-terms.md)
-2. [Lines and blocks](02-lines-and-blocks.md): `;`, `:` and `end`, comments, indentation, files and packages
+2. [Lines and blocks](02-lines-and-blocks.md): `;` and `end`, comments, indentation, files and packages
 3. [Words](03-words.md): keywords, names and brackets
 4. [Procedures](04-procedures.md): definitions, families, calls, `proc.main`, slides, `show_msg` and `ask`
 5. [Control flow](05-control-flow.md): `if`, comparisons, `while`, and what may follow an `if`
 6. [Variables](06-variables.md): `let`, `var`, changing, and values
 7. [Types](07-types.md): `Whole`, `Bool`, `Text`, lists and converting
-8. [Failures](08-failures.md): `?`, `??`, `otherwise:` and handler families
+8. [Failures](08-failures.md): `?`, `??`, `otherwise` and handler families
 9. [Built in](09-built-in.md): `range`, `sqrt`, `random`
 10. [Tools](10-tools.md): the compiler, the command, memory and build modes
 11. [Messages](11-messages.md): the layout, one mistake giving one message, and exit statuses

@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let name: Text = "Mia";
     let score: Whole = 120;
     show_msg("Hello, " & name & "!");

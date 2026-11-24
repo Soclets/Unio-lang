@@ -16,8 +16,8 @@ A procedure that can fail lists its failures at the end of its header, after `!`
 after `-> Type` when it gives back a value (D38, D39, D190):
 
 ```
-proc load_level[name: Text] -> Level ! [not_found, broken]:
-proc save_game[state: Text] ! [disk_full]:
+proc load_level[name: Text] -> Level ! [not_found, broken]
+proc save_game[state: Text] ! [disk_full]
 ```
 
 A failure's name is a plain word, like `not_found` (D39).
@@ -54,13 +54,13 @@ load_level(name) ?? crash;
 - **`?? crash`** stops the program on purpose, with a `failed:` message naming the procedure and its failure, and
   status 5 (D152).
 
-## `otherwise:`
+## `otherwise`
 
-`otherwise:` handles each failure in its own `case` (D23, D40):
+`otherwise` handles each failure in its own `case` (D23, D40):
 
 ```
 call otherwise:
-    case failure:
+    case failure
         body
 end otherwise
 ```
@@ -70,10 +70,10 @@ for it.
 
 ```
 let best: Whole = load_best_score() otherwise:
-    case not_found:
+    case not_found
         show_msg("No high score yet.");
         instead 0;
-    case unreadable:
+    case unreadable
         instead 0;
 end otherwise
 ```
@@ -86,7 +86,7 @@ end otherwise
 
 ```
 bag.add("Gem") otherwise:
-    case full:
+    case full
         show_msg("Your bag is full!");
 end otherwise
 show_msg("Onward!");
@@ -99,11 +99,11 @@ A handler is a named set of `case`s, declared with `handler` inside a `fam.handl
 (D41, D42):
 
 ```
-fam.handler word_failed:
-    handler word_failed.use_placeholder:
-        case too_long:
+fam.handler word_failed
+    handler word_failed.use_placeholder
+        case too_long
             instead "...";
-        case no_words:
+        case no_words
             instead "(none)";
     end handler word_failed.use_placeholder
 end fam.handler word_failed
@@ -119,13 +119,13 @@ let title: Text = first_word(heading) otherwise word_failed.use_placeholder;
 A handler that can `return` or `break` is marked `*` where it's used, as in `otherwise word_failed.*give_up;`. The mark
 is required on a handler that can jump, and refused on one that can't (D42).
 
-Inside an `otherwise:` block, `include family.handler;` brings in a handler's cases as if written there, and the
+Inside an `otherwise` block, `include family.handler;` brings in a handler's cases as if written there, and the
 block's own `case`s cover the failures it doesn't. Together they must cover every failure, none twice (D43):
 
 ```
 let title: Text = load_word(file) otherwise:
     include word_failed.use_placeholder;
-    case disk_full:
+    case disk_full
         instead "?";
 end otherwise
 ```

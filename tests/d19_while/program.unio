@@ -1,14 +1,14 @@
-proc.main:
+proc.main
     var n: Whole = 0;
-    while n < 3:
+    while n < 3
         show_msg(be.Text(n));
         n = n + 1;
     end while
     var m: Whole = 10;
-    while true:
-        if m eq 12:
+    while true
+        if m eq 12
             break;
-        else:
+        else
             m = m + 1;
         end if
     end while

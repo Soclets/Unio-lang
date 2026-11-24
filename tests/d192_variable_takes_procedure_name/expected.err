@@ -3,6 +3,6 @@ refused: program.unio:6:9, line 6 column 9
    |         ^^^^^^
  what:    `double` is already a procedure's name
  because: the procedure `double` is declared here
- 1 | proc double[n: Whole] -> Whole:
+ 1 | proc double[n: Whole] -> Whole
    |      ^^^^^^
  why:     a variable can't take a procedure's name, since `double` and `double()` would look alike.

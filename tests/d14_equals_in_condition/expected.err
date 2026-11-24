@@ -1,5 +1,5 @@
 refused: program.unio:3:14, line 3 column 14
- 3 |     if tries = 3:
+ 3 |     if tries = 3
    |              ^
- fix:     `    if tries eq 3:`
+ fix:     `    if tries eq 3`
  why:     `=` gives a variable a value, and is never part of a condition; `eq` compares.

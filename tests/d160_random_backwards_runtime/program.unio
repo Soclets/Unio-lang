@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let low: Whole = 7;
     let high: Whole = 3;
     let roll: Whole = random(from: low, to: high);

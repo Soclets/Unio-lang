@@ -1,7 +1,7 @@
-proc add[x: Whole, x: Whole] -> Whole:
+proc add[x: Whole, x: Whole] -> Whole
     return 0;
 end proc add
 
-proc.main:
+proc.main
     show_msg("Hi");
 end proc.main

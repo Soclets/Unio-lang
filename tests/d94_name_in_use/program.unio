@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let guess: Whole = 1;
     let guess: Whole = 2;
 end proc.main

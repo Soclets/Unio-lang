@@ -1,25 +1,25 @@
-proc heal[health: Whole, amount: Whole, times: Whole] -> Whole:
+proc heal[health: Whole, amount: Whole, times: Whole] -> Whole
     labels [amount as by, times as times];
     return health + amount * times;
 end proc heal
 
-proc larger[a: Whole, b: Whole] -> Whole:
-    if a > b:
+proc larger[a: Whole, b: Whole] -> Whole
+    if a > b
         return a;
-    else:
+    else
         return b;
     end if
 end proc larger
 
-proc show_if_positive[n: Whole]:
-    if n at_most 0:
+proc show_if_positive[n: Whole]
+    if n at_most 0
         return;
-    else:
+    else
         show_msg(be.Text(n));
     end if
 end proc show_if_positive
 
-proc.main:
+proc.main
     heal(50, by: 10, times: 2) |> be.Text |> show_msg;
     larger(3, 9) |> be.Text |> show_msg;
     show_if_positive(-1);

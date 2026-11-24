@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     show_msg.same_line("Score: ");
     let big: Whole = 9223372036854775807;
     let more: Whole = big + 1;

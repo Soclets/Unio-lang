@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let flipped: Float = 0.0 * -1.0;
     show_msg(be.Text(flipped));
     show_msg.fmt("{flipped, places: 2}");

@@ -7,7 +7,7 @@ The words this standard uses, each defined before a chapter relies on it.
 - **Program:** everything that's built and run together, starting from `proc.main` (chapter 4).
 - **Statement:** one instruction, ending with `;`, as in `show_msg("Hi");` (chapter 2).
 - **Block:** a group of statements with an opening line and a closer, like a procedure or an `if`.
-- **Opening line:** the line that starts a block, ending with `:`, as in `proc.main:`.
+- **Opening line:** the line that starts a block, ending with nothing, as in `proc.main` (D199).
 - **Closer:** the line that ends a block: `end` and what it closes, as in `end proc.main`.
 - **Body:** the statements between a block's opening line and its closer.
 - **Indentation:** the spaces at the start of a line.

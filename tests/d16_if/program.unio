@@ -1,22 +1,22 @@
-proc.main:
+proc.main
     let guess: Whole = 30;
     let secret: Whole = 42;
-    if guess < secret:
+    if guess < secret
         show_msg("Too low");
-    else if guess > secret:
+    else if guess > secret
         show_msg("Too high");
-    else:
+    else
         show_msg("Correct!");
     end if
-    if secret at_least 42:
+    if secret at_least 42
         show_msg("at least 42");
     end if
-    if secret at_most 41:
+    if secret at_most 41
         show_msg("never shown");
-    else:
+    else
         show_msg("not at most 41");
     end if
-    if guess not_eq secret:
+    if guess not_eq secret
         show_msg("different");
     end if
 end proc.main

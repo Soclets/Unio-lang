@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let won: Bool = true;
     let lost: Bool = false;
     show_msg("Won: " & be.Text(won));

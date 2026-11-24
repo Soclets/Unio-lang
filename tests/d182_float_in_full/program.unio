@@ -1,9 +1,9 @@
-proc.main:
+proc.main
     let huge: Float = 10000000000000000000000.0;
     show_msg(be.Text(huge));
     var doubled: Float = 1.0;
     var times: Whole = 0;
-    while times < 70:
+    while times < 70
         doubled = doubled * 2.0;
         times = times + 1;
     end while

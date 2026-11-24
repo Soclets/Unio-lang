@@ -45,7 +45,7 @@ Each message's wording is decided in batches, recorded in the decisions: D85 for
 declarations, comparing, converting, unhandled failures, joining text and keywords used as names, D88 for procedures,
 calls and `return`, D89 for types, labels lines, narrowing order, parameter forms and `&` beside maths, D92 for `.fmt`,
 a program's shape, names, unreadable code, overflow and the tools' own messages, D102 for parameters, narrowings,
-`else:`, D81's refusals, names in use, knock-on errors, names, blank lines and spacing, D103 for the command's own
+`else`, D81's refusals, names in use, knock-on errors, names, blank lines and spacing, D103 for the command's own
 messages, words with no more narrowings, and `NotBuiltYet` and `NotDesignedYet`, D132 for five brought up to date, D142
 for negation's overflow, bad names and D128's slides, D161 for lines outside procedures, unknown types, `not`, `and` and
 `or`, value-only lines, other files, `unio oracle` and usage, and D119 for `extern.rust`'s refusals and its macro's

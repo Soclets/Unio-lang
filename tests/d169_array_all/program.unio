@@ -1,7 +1,7 @@
-proc.main:
+proc.main
     var board: Array<Whole>[len: 4] = [all: 0];
     board[pos: 2] = 7;
-    for each cell in board:
+    for each cell in board
         show_msg(be.Text(cell));
     end for
     show_msg(be.Text(board.len));

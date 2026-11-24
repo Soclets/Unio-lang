@@ -1,7 +1,7 @@
 # 2. Lines and blocks
 
 ```
-proc.main:
+proc.main
     show_msg("Hello, World!");
 end proc.main
 ```
@@ -22,18 +22,18 @@ A missing `;` is refused, with the place it goes as the fix (D7).
 
 ## Blocks
 
-A block's opening line ends with `:`, and its closer is `end` followed by what it closes, standing alone with no `;`
-(D8):
+A block's opening line ends with nothing, neither `;` nor `:`, and its closer is `end` followed by what it closes,
+standing alone with no `;` (D8, D199):
 
 ```
-opening line:
+opening line
     body
 end what
 ```
 
 where `opening line` is the block's first line, like `proc.main` or `if a > b`; `body` is its statements; and `what`
-is what the block is, like `proc.main`, `proc larger` or `if`. The `:`, the word `end` and the line breaks are written
-as they are.
+is what the block is, like `proc.main`, `proc larger` or `if`. The word `end` and the line breaks are written as they
+are. An opening line ending with `:`, as Python writes it, is refused (D199).
 
 **Not decided:** what a closer says for every kind of block besides procedures and `if`.
 
@@ -65,22 +65,22 @@ them all (D100).
 ## Comments
 
 - **`//` comments to the end of the line** (D74).
-- **A comment on a line of its own is indented like the line after it,** or, right before a closer or `else:`, one
+- **A comment on a line of its own is indented like the line after it,** or, right before a closer or `else`, one
   level in, like the lines in the block it ends. Any other indentation is refused, with the corrected line as the fix
   (D10, D145).
 - **`///` is a doc comment** on the lines right before a declaration; one with no declaration after it is refused
   (D74).
-- **`comment name:` to `end comment name` is a block comment.** Everything between is ignored, and it ends only at its
+- **`comment name` to `end comment name` is a block comment.** Everything between is ignored, and it ends only at its
   own `end comment` with its name, so comment blocks can sit inside each other (D74).
 
 ```
 /// Gives the larger of two whole numbers.
-proc larger[a: Whole, b: Whole] -> Whole:
+proc larger[a: Whole, b: Whole] -> Whole
     // the tie goes to b
     ...
 end proc larger
 
-comment old_scoring:
+comment old_scoring
     let bonus: Whole = tries * 10;
 end comment old_scoring
 ```

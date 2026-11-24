@@ -1,12 +1,12 @@
-proc sum_to[n: Whole] -> Whole:
-    if n < 1:
+proc sum_to[n: Whole] -> Whole
+    if n < 1
         return 0;
-    else:
+    else
         return n + sum_to(n - 1);
     end if
 end proc sum_to
 
-proc.main:
+proc.main
     10 |> sum_to |> be.Text |> show_msg;
     0 |> sum_to |> be.Text |> show_msg;
 end proc.main

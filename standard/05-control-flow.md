@@ -3,24 +3,24 @@
 ## `if`
 
 ```
-if condition:
+if condition
     body
-else if condition:
+else if condition
     body
-else:
+else
     body
 end if
 ```
 
 where each `condition` is what's checked and each `body` the statements run when it holds. There can be any number of
-`else if` parts and at most one `else:`, and both are optional. One `end if` closes the whole chain (D8, D16).
+`else if` parts and at most one `else`, and both are optional. One `end if` closes the whole chain (D8, D16).
 
 ```
-if guess < secret:
+if guess < secret
     show_msg("Too low");
-else if guess > secret:
+else if guess > secret
     show_msg("Too high");
-else:
+else
     show_msg("Correct!");
 end if
 ```
@@ -44,8 +44,8 @@ hp at_most 100
 - **On two `Float`s, every comparison is exact,** comparing the stored values: `~0.1 + ~0.2 eq ~0.3` is `false`,
   since the two are neighbouring `Float`s (D184).
 
-**A condition must be a `Bool`** (D187). A number or text doesn't stand for true or false: `if lives:` is refused,
-with `if lives not_eq 0:` as the fix.
+**A condition must be a `Bool`** (D187). A number or text doesn't stand for true or false: `if lives` is refused,
+with `if lives not_eq 0` as the fix.
 
 **Not decided:** comparing two pieces of text.
 
@@ -55,11 +55,11 @@ Conditions combine with `and`, `or` and `not`: `not` first, then `and`, then `or
 (D34):
 
 ```
-if not won:
+if not won
     show_msg.fmt("Out of tries! It was {secret}.");
 end if
 
-if hp at_least 1 and lives > 0 or cheat eq true:
+if hp at_least 1 and lives > 0 or cheat eq true
 ```
 
 The second means `(hp at_least 1 and lives > 0) or cheat eq true`.
@@ -71,7 +71,7 @@ The second means `(hp at_least 1 and lives > 0) or cheat eq true`.
 ## `while`
 
 ```
-while condition:
+while condition
     body
 end while
 ```
@@ -80,7 +80,7 @@ where `condition` is checked before each pass, and `body` is run again as long a
 
 ```
 var tries: Whole = 0;
-while tries < 5:
+while tries < 5
     show_msg("Guess!");
     tries = tries + 1;
 end while
@@ -92,7 +92,7 @@ rarely lands exactly on a value, so the loop could skip past it and never stop; 
 
 ```
 var timer: Float = 0.0;
-while timer < 1.0:          // `while timer not_eq 1.0:` is refused
+while timer < 1.0           // `while timer not_eq 1.0` is refused
     timer = timer + ~0.1;
 end while
 ```
@@ -102,11 +102,11 @@ end while
 `for each` runs its body once for each item, in order (D171):
 
 ```
-for each name in students:
+for each name in students
     show_msg(name);
 end for
 
-for each round in range[from: 1, to: 3]:
+for each round in range[from: 1, to: 3]
     show_msg.fmt("Round {round}!");
 end for
 ```
@@ -120,7 +120,7 @@ end for
   while looping, use `while` over its positions.
 
 ```
-for each name in players:
+for each name in players
     players.add("Bob");   // refused: players is being gone through
 end for
 ```
@@ -129,7 +129,7 @@ The position comes with the item when the line says `at pos` (counting from 1) o
 between the item and `in`, the same two words as for reaching an item (D75, D174):
 
 ```
-for each name at pos i in students:
+for each name at pos i in students
     show_msg.fmt("{i}. {name}");
 end for
 ```
@@ -146,14 +146,14 @@ end for
 (D32). Nothing may follow `break;` in the same block, as nothing may follow `return` (D57, D117).
 
 ```
-while tries < 7:
+while tries < 7
     let guess: Whole = be.Whole(ask("Your guess: ")) ?? 0;
     tries = tries + 1;
-    if guess < secret:
+    if guess < secret
         show_msg("Too low");
-    else if guess > secret:
+    else if guess > secret
         show_msg("Too high");
-    else:
+    else
         show_msg.fmt("Correct! You got it in {tries} tries.");
         break;
     end if
@@ -192,10 +192,10 @@ block, and code that should run afterwards goes in the ways that don't leave (D9
 Each is refused at compile time (D9).
 
 ```
-proc larger[a: Whole, b: Whole] -> Whole:
-    if a > b:
+proc larger[a: Whole, b: Whole] -> Whole
+    if a > b
         return a;
-    else:
+    else
         return b;
     end if
 end proc larger

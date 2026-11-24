@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let price: Whole = 12;
     let count: Whole = 3;
     var total: Whole = price * count;

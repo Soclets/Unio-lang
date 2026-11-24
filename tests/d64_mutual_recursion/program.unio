@@ -1,28 +1,28 @@
-proc is_even[n: Whole] -> Bool:
-    if n eq 0:
+proc is_even[n: Whole] -> Bool
+    if n eq 0
         return true;
-    else:
+    else
         return is_odd(n - 1);
     end if
 end proc is_even
 
-proc is_odd[n: Whole] -> Bool:
-    if n eq 0:
+proc is_odd[n: Whole] -> Bool
+    if n eq 0
         return false;
-    else:
+    else
         return is_even(n - 1);
     end if
 end proc is_odd
 
-proc show_even[n: Whole]:
-    if is_even(n):
+proc show_even[n: Whole]
+    if is_even(n)
         show_msg.fmt("{n} is even");
-    else:
+    else
         show_msg.fmt("{n} is odd");
     end if
 end proc show_even
 
-proc.main:
+proc.main
     show_even(10);
     show_even(7);
 end proc.main

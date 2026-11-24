@@ -267,6 +267,8 @@ required for looks, as a decision of its own. This is Plainly v1's shape (its D3
 
 **Tankun's words.** Asked "Blocks open with `:` and close with `end` plus what they close?", the owner chose: "yea".
 
+(Changed by D199: an opening line ends with nothing, no `:`.)
+
 ## D9. After an `if` where any way leaves, nothing follows `end if`
 
 2026-11-20.
@@ -6083,3 +6085,40 @@ the SIL Open Font License, so the docs can carry it, and it has the bold and ita
 
 **Tankun's words.** "Lol, kinda want my own CC0 font?", "Bro, I think I'm seeing the same fonts here", then, shown the
 three fonts again, the owner chose: "Atkin. Btw, why is `.main` still yellow?"
+
+## D199. A block's opening line ends with nothing, no `:`
+
+2026-11-24.
+
+**Chosen.** A block's opening line ends with nothing, replacing D8's `:`. Its closer is still `end` and what it closes
+(D8):
+
+```
+proc heal[hp: Whole, amount: Whole] -> Whole
+    if hp + amount at_least 100
+        return 100;
+    else
+        return hp + amount;
+    end if
+end proc heal
+```
+
+What follows from it:
+- **Every opening line drops its `:`:** `proc.main`, `else`, `while true`, `for each name in students`, `otherwise`,
+  `case full`, `comment old_scoring`, `fam.proc show_msg`.
+- **An opening line ending with `:`, as Python writes it, is refused,** with the line without it as the fix; its
+  wording comes with a later batch. D8's message for a missing `:` goes, and so does its test.
+- **`:` has one meaning left:** a name, then what it is, as in `hp: Whole`, `by: 30` and `[pos: 1]`.
+
+**Weighed.**
+- Keeping `:` (D8). Python's look, the language most learners meet next, and an opening line could someday run over
+  several lines with `:` marking where it ends. Unio hasn't decided whether a condition can span lines, so nothing is
+  lost today.
+
+**Why this won.** `end` already marks where every block ends, so the `:` only repeated what the line's first word
+says, and a missing one was a common beginner mistake. Without it, `:` means one thing, as Unio's symbols do (D3,
+D165). Ruby and Seal (Seal D9) open blocks the same way.
+
+**Tankun's words.** "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What
+about the font?" (quoted whole in D194), then, asked "Should block openers lose their `:`, as in `if hp at_least max`
+and `else`, replacing D8's `:`?", the owner chose: "yea. How do i switch Claude to atkin for code"

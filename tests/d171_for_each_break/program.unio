@@ -1,8 +1,8 @@
-proc.main:
+proc.main
     let scores: List<Whole> = [5, 12, 8, 30];
     var total: Whole = 0;
-    for each score in scores:
-        if score eq 8:
+    for each score in scores
+        if score eq 8
             break;
         end if
         total = total + score;

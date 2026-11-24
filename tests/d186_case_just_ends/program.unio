@@ -1,11 +1,11 @@
-proc.main:
+proc.main
     var bag: List<Text>[len.max: 1] = [];
     bag.add("Gem") otherwise:
-        case full:
+        case full
             show_msg("Your bag is full!");
     end otherwise
     bag.add("Key") otherwise:
-        case full:
+        case full
             show_msg("Your bag is full!");
     end otherwise
     show_msg("Onward!");

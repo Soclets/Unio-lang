@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     let name: Text = ask("Your name: ");
     show_msg.fmt("Hi, {name}!");
     let guess: Whole = be.Whole(ask("A number: ")) ?? 0;

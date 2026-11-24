@@ -1,4 +1,4 @@
-proc.main:
+proc.main
     show_msg.same_line("Lives: ");
     show_msg("3");
     show_msg("done");

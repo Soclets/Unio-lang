@@ -29,12 +29,13 @@ refusal lives, the readings taken where the standard was quiet, and the answered
 treat anything you remember from that milestone as older than `DECISIONS.md`, which wins wherever they differ.
 
 That subset is a small part of Unio. Since then the design session and Tankun have decided a great deal more, up to
-D195: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
+D199: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
 D42 to D44, D186), families (D41), comments and spacing (D74, D97, D98), several files in one program (D64, D188),
 `Bool` conditions (D187), and new spellings (D190: `eq` and `not_eq` for `==` and `!=`, `-> Type` for `returns`, and
-`! [ … ]` for `fails`; D192: names have no `$`; D195: `labels [ … ]`). The compiler is now called `Beta++` (D191).
-Tests in `tests/` changed with D190, D192 and D195, so some your first milestone passed now fail until Ralph reads the
-new spellings.
+`! [ … ]` for `fails`; D192: names have no `$`; D195: `labels [ … ]`; D199: no `:` on opening lines). The compiler
+is now called `Beta++` (D191). Tests in `tests/` changed with D190, D192, D195 and D199, so some your first milestone
+passed now fail until Ralph reads the new spellings. D193 to D198 are about colours, fonts and words, and change
+nothing Ralph runs.
 </context>
 
 <sources>
@@ -62,7 +63,7 @@ more than being fast. Never read `compiler/`: if Ralph copied the compiler, thei
 
 <finish_line>
 Build all of Unio as decided, except what only the compiler can do. Done when all of these hold:
-1. **Every decision is built,** from D1 to D195, except `extern.cpp` (C++ bodies, the compiler's), build modes and
+1. **Every decision is built,** from D1 to D199, except `extern.cpp` (C++ bodies, the compiler's), build modes and
    anything about speed, which Ralph doesn't have (D46, Building rule 1), and everything the standard marks Not
    decided, which stops with `NotDesignedYet`.
 2. **Every test in `tests/` passes,** standard output, standard error and exit status byte for byte, as
@@ -96,7 +97,7 @@ Many refusals, checks and failures are decided but have no wording yet. Draft ea
 `PROGRESS.md`, send them to the design session, which brings them to Tankun, and build them with the draft wording
 meanwhile.
 
-Work in checkpoints that each end with something running, such as the D190 and D192 spellings with every old test passing again,
+Work in checkpoints that each end with something running, such as the new spellings with every old test passing again,
 lists and loops, failures in full, floats with their proofs, or `check/` comparing with `Beta++`. Report each
 checkpoint to Tankun as it lands, and carry straight on to the next. When all four hold, report it to Tankun, with the
 theorems' statements in plain words, and stop: what comes next is Tankun's call.
@@ -151,10 +152,10 @@ compaction you can carry on from them and `git log`.
 
 <first_steps>
 1. Run `pwd`, then read the sources above.
-2. Run the one command from `PROGRESS.md` and note which tests D190's and D192's new spellings now fail, before changing anything.
+2. Run the one command from `PROGRESS.md` and note which tests the new spellings now fail, before changing anything.
 3. Add a plan to `PROGRESS.md`: checkpoints in small steps that each end with something running, with the order you'll
    prove things in.
-4. Start with D190's and D192's spellings, so every test the first milestone passed passes again.
+4. Start with the new spellings (D190, D192, D195, D199), so every test the first milestone passed passes again.
 5. Then widen the language one checkpoint at a time, proving as you go rather than all at the end.
 </first_steps>
 ````

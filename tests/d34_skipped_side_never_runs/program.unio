@@ -1,14 +1,14 @@
-proc forever[n: Whole] -> Bool:
+proc forever[n: Whole] -> Bool
     return forever(n);
 end proc forever
 
-proc.main:
-    if true or forever(1):
+proc.main
+    if true or forever(1)
         show_msg("or stopped early");
     end if
-    if false and forever(1):
+    if false and forever(1)
         show_msg("never shown");
-    else:
+    else
         show_msg("and stopped early");
     end if
 end proc.main

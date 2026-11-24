@@ -1,4 +1,4 @@
-proc show_ways[x: Float]:
+proc show_ways[x: Float]
     let down: Whole = be.Whole.floor(x);
     let cut: Whole = be.Whole.trunc(x);
     let up: Whole = be.Whole.ceil(x);
@@ -7,7 +7,7 @@ proc show_ways[x: Float]:
     show_msg.fmt("{down} {cut} {up} {near} {even}");
 end proc show_ways
 
-proc.main:
+proc.main
     show_ways(~2.7);
     show_ways(0.0 - ~2.7);
     show_ways(2.5);

@@ -3,20 +3,20 @@
 ## Definitions
 
 ```
-proc name[parameters] -> Type:
+proc name[parameters] -> Type
     body
 end proc name
 ```
 
 where `name` is the procedure's name, `parameters` its parameters separated by commas, `Type` the type it gives back,
-and `body` its statements. `proc`, `->`, the brackets, the `:` and `end proc` are written as they are (D3, D8, D190).
+and `body` its statements. `proc`, `->`, the brackets and `end proc` are written as they are (D3, D8, D190, D199).
 
 A definition writes its parameters in `[ ]` (D165), and only when it has some; written in `( )`, they're refused,
 with the `[ ]` form as the fix (D166). One that takes nothing has no brackets
 (D4):
 
 ```
-proc roll_dice -> Whole:
+proc roll_dice -> Whole
     ...
 end proc roll_dice
 ```
@@ -28,7 +28,7 @@ A procedure that gives back a value says so at the end of its header, with `->` 
 A procedure that gives nothing back writes no `->` (D38, D190):
 
 ```
-proc greet[name: Text]:
+proc greet[name: Text]
 ```
 
 Using what such a procedure gives as a value is refused (D38).
@@ -37,7 +37,7 @@ Using what such a procedure gives as a value is refused (D38).
 
 - **`return value;`** gives back a value of the header's type, and every way through a procedure with `->` must
   end in one (D57). Every `while` counts as able to end, whatever its condition, so a procedure that loops with
-  `while true:` still needs a `return` after the loop (D149).
+  `while true` still needs a `return` after the loop (D149).
 - **A bare `return;`** leaves early, in a procedure with no `->` (D57).
 - **Nothing may follow `return` in the same block** (D57).
 - **A bare `return;` as a procedure's last line is refused** (D57).
@@ -49,9 +49,9 @@ a type (D126). Writing a shared type once in front, as in `proc add[Whole a, b]`
 parameter is read-only, like a `let` (D147).
 
 ```
-proc add[a: Whole, b: Whole] -> Whole:
-proc draw[x: Whole, name: Text]:
-proc double[n: Whole] -> Whole:
+proc add[a: Whole, b: Whole] -> Whole
+proc draw[x: Whole, name: Text]
+proc double[n: Whole] -> Whole
 ```
 
 Failures in a header: chapter 8.
@@ -62,7 +62,7 @@ Failures in a header: chapter 8.
 empty, or holds only a `labels` line, and its closer doesn't repeat `extern.cpp` (D36, D131):
 
 ```
-extern.cpp proc beep -> Bool:
+extern.cpp proc beep -> Bool
 end proc beep
 ```
 
@@ -77,7 +77,7 @@ A family declares a word and its kinds together, in a block saying what kind of 
 (D41):
 
 ```
-fam.kind word:
+fam.kind word
     members
 end fam.kind word
 ```
@@ -86,12 +86,12 @@ where `kind` is what the family holds (`proc` for a procedure and its narrowings
 `word` the word, and `members` its declarations.
 
 ```
-fam.proc show_msg:
-    proc show_msg[text: Text]:
+fam.proc show_msg
+    proc show_msg[text: Text]
         ...
     end proc show_msg
 
-    proc show_msg.same_line[text: Text]:
+    proc show_msg.same_line[text: Text]
         ...
     end proc show_msg.same_line
 end fam.proc show_msg
@@ -144,7 +144,7 @@ the `[ ]`, the commas and the `;` are written as they are, with one space betwee
 without its `[ ]` is refused (D195).
 
 ```
-proc random[low: Whole, high: Whole] -> Whole:
+proc random[low: Whole, high: Whole] -> Whole
     labels [low as from, high as to];
     ...
 end proc random
@@ -161,7 +161,7 @@ and `to:` (D25).
 since only the program's start runs it (D4):
 
 ```
-proc.main:
+proc.main
     show_msg("Hello, World!");
 end proc.main
 ```

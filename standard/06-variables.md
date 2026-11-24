@@ -48,7 +48,7 @@ tries = tries + 1;
 - **`=` on a `let` is refused,** since a `let` never changes (D13, D14).
 - **`=` on a parameter is refused too:** a plain parameter is read-only, like a `let`. To change a copy, declare a
   `var` from it, as in `var left: Whole = n;` (D147).
-- **`=` never appears inside a condition,** so `if tries = 3:` is refused (D14).
+- **`=` never appears inside a condition,** so `if tries = 3` is refused (D14).
 
 ## Values
 
