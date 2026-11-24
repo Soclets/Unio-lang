@@ -1,4 +1,0 @@
-proc.main:
-    let $tries: Whole = 4;
-    show_msg.fmt("You got it in {tries} tries.");
-end proc.main

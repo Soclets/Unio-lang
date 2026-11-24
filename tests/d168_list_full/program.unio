@@ -1,13 +1,13 @@
 proc.main:
-    var $bag: List<Text>[len.max: 2] = [];
-    let $found: List<Text> = ["Gem", "Key", "Map"];
-    for each $item in $found:
-        $bag.add($item) otherwise:
+    var bag: List<Text>[len.max: 2] = [];
+    let found: List<Text> = ["Gem", "Key", "Map"];
+    for each item in found:
+        bag.add(item) otherwise:
             case full:
-                show_msg.fmt("No room for {$item}.");
+                show_msg.fmt("No room for {item}.");
                 break;
         end otherwise
-        show_msg.fmt("Took {$item}.");
+        show_msg.fmt("Took {item}.");
     end for
-    show_msg(be.Text($bag.len));
+    show_msg(be.Text(bag.len));
 end proc.main

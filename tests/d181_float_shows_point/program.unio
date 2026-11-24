@@ -1,9 +1,9 @@
 proc.main:
-    let $whole_speed: Float = 6.0 + 1.0;
-    show_msg(be.Text($whole_speed));
-    let $back: Float = 0.0 - 3.0;
-    show_msg(be.Text($back));
-    let $half: Float = 2.5;
-    show_msg(be.Text($half));
-    show_msg.fmt("{$whole_speed, places: 0}");
+    let whole_speed: Float = 6.0 + 1.0;
+    show_msg(be.Text(whole_speed));
+    let back: Float = 0.0 - 3.0;
+    show_msg(be.Text(back));
+    let half: Float = 2.5;
+    show_msg(be.Text(half));
+    show_msg.fmt("{whole_speed, places: 0}");
 end proc.main

@@ -1,4 +1,4 @@
-proc add[$x: Whole, $x: Whole] -> Whole:
+proc add[x: Whole, x: Whole] -> Whole:
     return 0;
 end proc add
 

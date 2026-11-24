@@ -1,1 +1,1 @@
-= on a let is refused, with because: showing the line that declares it. D14, D54, D78, D85, D86, D87, D125; standard ch. 6 and 11.
+= on a let is refused, with because: showing the line that declares it. D14, D54, D78, D85, D86, D87, D192; standard ch. 6 and 11.

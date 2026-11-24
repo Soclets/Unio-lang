@@ -16,9 +16,9 @@ where each `condition` is what's checked and each `body` the statements run when
 `else if` parts and at most one `else:`, and both are optional. One `end if` closes the whole chain (D8, D16).
 
 ```
-if $guess < $secret:
+if guess < secret:
     show_msg("Too low");
-else if $guess > $secret:
+else if guess > secret:
     show_msg("Too high");
 else:
     show_msg("Correct!");
@@ -28,12 +28,12 @@ end if
 ## Comparisons
 
 ```
-$lives eq 0
-$guess not_eq $secret
-$guess < $secret
-$score > $best
-$hp at_least 1
-$hp at_most 100
+lives eq 0
+guess not_eq secret
+guess < secret
+score > best
+hp at_least 1
+hp at_most 100
 ```
 
 - **`eq` and `not_eq`:** equal and not equal (D17, D190).
@@ -44,8 +44,8 @@ $hp at_most 100
 - **On two `Float`s, every comparison is exact,** comparing the stored values: `~0.1 + ~0.2 eq ~0.3` is `false`,
   since the two are neighbouring `Float`s (D184).
 
-**A condition must be a `Bool`** (D187). A number or text doesn't stand for true or false: `if $lives:` is refused,
-with `if $lives not_eq 0:` as the fix.
+**A condition must be a `Bool`** (D187). A number or text doesn't stand for true or false: `if lives:` is refused,
+with `if lives not_eq 0:` as the fix.
 
 **Not decided:** comparing two pieces of text.
 
@@ -55,11 +55,11 @@ Conditions combine with `and`, `or` and `not`: `not` first, then `and`, then `or
 (D34):
 
 ```
-if not $won:
-    show_msg.fmt("Out of tries! It was {$secret}.");
+if not won:
+    show_msg.fmt("Out of tries! It was {secret}.");
 end if
 
-if $hp at_least 1 and $lives > 0 or $cheat eq true:
+if hp at_least 1 and lives > 0 or cheat eq true:
 ```
 
 The second means `(hp at_least 1 and lives > 0) or cheat eq true`.
@@ -79,10 +79,10 @@ end while
 where `condition` is checked before each pass, and `body` is run again as long as it holds (D19).
 
 ```
-var $tries: Whole = 0;
-while $tries < 5:
+var tries: Whole = 0;
+while tries < 5:
     show_msg("Guess!");
-    $tries = $tries + 1;
+    tries = tries + 1;
 end while
 ```
 
@@ -91,9 +91,9 @@ rarely lands exactly on a value, so the loop could skip past it and never stop; 
 "until it reaches", and the refusal's fix gives one:
 
 ```
-var $timer: Float = 0.0;
-while $timer < 1.0:          // `while $timer not_eq 1.0:` is refused
-    $timer = $timer + ~0.1;
+var timer: Float = 0.0;
+while timer < 1.0:          // `while timer not_eq 1.0:` is refused
+    timer = timer + ~0.1;
 end while
 ```
 
@@ -102,26 +102,26 @@ end while
 `for each` runs its body once for each item, in order (D171):
 
 ```
-for each $name in $students:
-    show_msg($name);
+for each name in students:
+    show_msg(name);
 end for
 
-for each $round in range[from: 1, to: 3]:
-    show_msg.fmt("Round {$round}!");
+for each round in range[from: 1, to: 3]:
+    show_msg.fmt("Round {round}!");
 end for
 ```
 
 - **It goes through a `List`, an `Array` or a `range[…]`** (D167, D170, D171).
-- **`$name` is a new variable for each pass,** declared by the `for each` itself as a `let`, and it ends with the loop
+- **`name` is a new variable for each pass,** declared by the `for each` itself as a `let`, and it ends with the loop
   (D93, D171).
 - **It closes with `end for`,** and `break` leaves it, as it leaves a `while` (D8, D32, D171).
 - **The list it's going through can't change inside it.** Anything in the body that changes that variable, such as
-  `$players.add(…)`, setting an item or setting the whole variable, is refused at compile time (D173). To change a list
+  `players.add(…)`, setting an item or setting the whole variable, is refused at compile time (D173). To change a list
   while looping, use `while` over its positions.
 
 ```
-for each $name in $players:
-    $players.add("Bob");   // refused: $players is being gone through
+for each name in players:
+    players.add("Bob");   // refused: players is being gone through
 end for
 ```
 
@@ -129,14 +129,14 @@ The position comes with the item when the line says `at pos` (counting from 1) o
 between the item and `in`, the same two words as for reaching an item (D75, D174):
 
 ```
-for each $name at pos $i in $students:
-    show_msg.fmt("{$i}. {$name}");
+for each name at pos i in students:
+    show_msg.fmt("{i}. {name}");
 end for
 ```
 
-- **`$i` is made by the line too,** a `let` like `$name`, new for each pass and ended with the loop (D174).
-- **It fits the matching label:** with `at offset $i`, `$students[offset: $i]` is the same item as `$name`; with
-  `at pos $i`, `$students[pos: $i]` is (D174).
+- **`i` is made by the line too,** a `let` like `name`, new for each pass and ended with the loop (D174).
+- **It fits the matching label:** with `at offset i`, `students[offset: i]` is the same item as `name`; with
+  `at pos i`, `students[pos: i]` is (D174).
 
 **Not decided:** going through text; the wording of D173's refusal.
 
@@ -146,15 +146,15 @@ end for
 (D32). Nothing may follow `break;` in the same block, as nothing may follow `return` (D57, D117).
 
 ```
-while $tries < 7:
-    let $guess: Whole = be.Whole(ask("Your guess: ")) ?? 0;
-    $tries = $tries + 1;
-    if $guess < $secret:
+while tries < 7:
+    let guess: Whole = be.Whole(ask("Your guess: ")) ?? 0;
+    tries = tries + 1;
+    if guess < secret:
         show_msg("Too low");
-    else if $guess > $secret:
+    else if guess > secret:
         show_msg("Too high");
     else:
-        show_msg.fmt("Correct! You got it in {$tries} tries.");
+        show_msg.fmt("Correct! You got it in {tries} tries.");
         break;
     end if
 end while
@@ -192,11 +192,11 @@ block, and code that should run afterwards goes in the ways that don't leave (D9
 Each is refused at compile time (D9).
 
 ```
-proc larger[$a: Whole, $b: Whole] -> Whole:
-    if $a > $b:
-        return $a;
+proc larger[a: Whole, b: Whole] -> Whole:
+    if a > b:
+        return a;
     else:
-        return $b;
+        return b;
     end if
 end proc larger
 ```

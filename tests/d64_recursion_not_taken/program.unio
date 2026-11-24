@@ -1,8 +1,8 @@
-proc one[$n: Whole] -> Whole:
-    if $n < 2:
+proc one[n: Whole] -> Whole:
+    if n < 2:
         return 2;
     else:
-        return one($n - 1);
+        return one(n - 1);
     end if
 end proc one
 

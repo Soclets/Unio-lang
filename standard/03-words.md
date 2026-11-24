@@ -41,16 +41,21 @@ message".
 
 ## Names
 
-A variable's name starts with `$`, like `$secret` or `$tries`, written the same where it's made and where it's used. A
-parameter is a variable too, so its name has the `$`. A procedure's name is a plain word, like `larger` or `roll_dice`,
-with no `$` (D125).
+A variable's name is a plain word with no mark, like `secret` or `tries`, written the same where it's made and where
+it's used. A parameter is a variable too. A procedure's name is a plain word as well, like `larger` or `roll_dice`
+(D192).
 
-Since `$` keeps them apart, a variable's name can be a keyword, as in `$if`, and a keyword added later never breaks a
-program's names; a variable can also share a procedure's name, as in `let $roll: Whole = roll();` (D125, D127). A
-procedure's name can't be a keyword (D58, for procedures).
+A name can't be a keyword, a variable's or a procedure's: `let if: Whole = 1;` is refused (D58, D192). If a later
+version of Unio adds a keyword, a program already using that word as a name stops building and has to rename it. A
+variable can't take a procedure's name either, since `roll` and `roll()` would look alike (D94, D192).
 
-A name, after a variable's `$`, is lowercase English letters `a` to `z`, digits, and `_` between words, starting with
-a letter: `$player2`, `$hp_max_2`, `roll_dice`. No capitals, and `_` never at the start or end, nor two in a row (D99).
+Where code is shown, the `unio` command and the docs colour it, so names, keywords, procedures and types look different
+(D192).
+
+**Not decided:** which colours, and when the command uses them.
+
+A name is lowercase English letters `a` to `z`, digits, and `_` between words, starting with
+a letter: `player2`, `hp_max_2`, `roll_dice`. No capitals, and `_` never at the start or end, nor two in a row (D99).
 
 **Not decided:** letters beyond English.
 
@@ -60,8 +65,8 @@ Each kind of bracket has one meaning (D3, D165):
 
 | Bracket | Means | Examples |
 |---|---|---|
-| `( )` | calls a procedure; and, as school maths writes it, groups in maths | `add(1, 2)`, `($a + $b) * 2` |
-| `[ ]` | values, listed or described: a list, reaching an item, a type's settings, a procedure's parameters, building a record | `[1, 2, 3]`, `$bag[pos: 1]`, `List<Text>[max: 10]`, `proc add[$a: Whole, $b: Whole]` |
+| `( )` | calls a procedure; and, as school maths writes it, groups in maths | `add(1, 2)`, `(a + b) * 2` |
+| `[ ]` | values, listed or described: a list, reaching an item, a type's settings, a procedure's parameters, building a record | `[1, 2, 3]`, `bag[pos: 1]`, `List<Text>[max: 10]`, `proc add[a: Whole, b: Whole]` |
 | `< >` | a type, filled in | `List<Whole>` |
 
 `( )` marks where a procedure is called, code with a name and a body; built-in operations, like `+`, reaching an item

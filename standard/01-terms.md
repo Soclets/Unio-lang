@@ -17,7 +17,7 @@ The words this standard uses, each defined before a chapter relies on it.
 - **Keyword:** a word that's part of Unio itself, like `proc`, `end` or `if`. A program can't choose its own
   keywords.
 - **Name:** a word a program chooses, for a variable or a procedure.
-- **Variable:** a named place holding a value, as in `$score`; its name starts with `$` (D125).
+- **Variable:** a named place holding a value, as in `score`; its name is a plain word (D192).
 - **Declaration:** the statement that makes a new variable, starting with `let` or `var` (chapter 6).
 - **Value:** a piece of data, like a number or a piece of text.
 - **Type:** the kind of a value, like a whole number or text, as in `Whole` (chapter 7).

@@ -1,8 +1,8 @@
 proc.main:
-    let $name: Text = ask("Your name: ");
-    show_msg.fmt("Hi, {$name}!");
-    let $guess: Whole = be.Whole(ask("A number: ")) ?? 0;
-    show_msg(be.Text($guess + 1));
-    let $bad: Whole = be.Whole(ask("Another: ")) ?? 7;
-    show_msg(be.Text($bad));
+    let name: Text = ask("Your name: ");
+    show_msg.fmt("Hi, {name}!");
+    let guess: Whole = be.Whole(ask("A number: ")) ?? 0;
+    show_msg(be.Text(guess + 1));
+    let bad: Whole = be.Whole(ask("Another: ")) ?? 7;
+    show_msg(be.Text(bad));
 end proc.main

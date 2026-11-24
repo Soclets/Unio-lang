@@ -1,6 +1,6 @@
 proc.main:
-    let $tries: Whole = 3;
-    if $tries = 3:
+    let tries: Whole = 3;
+    if tries = 3:
         show_msg("three");
     end if
 end proc.main

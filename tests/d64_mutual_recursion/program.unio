@@ -1,24 +1,24 @@
-proc is_even[$n: Whole] -> Bool:
-    if $n eq 0:
+proc is_even[n: Whole] -> Bool:
+    if n eq 0:
         return true;
     else:
-        return is_odd($n - 1);
+        return is_odd(n - 1);
     end if
 end proc is_even
 
-proc is_odd[$n: Whole] -> Bool:
-    if $n eq 0:
+proc is_odd[n: Whole] -> Bool:
+    if n eq 0:
         return false;
     else:
-        return is_even($n - 1);
+        return is_even(n - 1);
     end if
 end proc is_odd
 
-proc show_even[$n: Whole]:
-    if is_even($n):
-        show_msg.fmt("{$n} is even");
+proc show_even[n: Whole]:
+    if is_even(n):
+        show_msg.fmt("{n} is even");
     else:
-        show_msg.fmt("{$n} is odd");
+        show_msg.fmt("{n} is odd");
     end if
 end proc show_even
 

@@ -1,1 +1,1 @@
-Two parameters with one name are refused. D102, D125, D126, D165; standard ch. 4 and 11.
+Two parameters with one name are refused. D102, D126, D165, D192; standard ch. 4 and 11.

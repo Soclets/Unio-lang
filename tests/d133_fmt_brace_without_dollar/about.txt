@@ -1,1 +1,0 @@
-A name in .fmt braces without its $ is refused, with the $ added as the fix. D29, D101, D125, D133; standard ch. 7 and 11.

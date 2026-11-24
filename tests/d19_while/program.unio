@@ -1,16 +1,16 @@
 proc.main:
-    var $n: Whole = 0;
-    while $n < 3:
-        show_msg(be.Text($n));
-        $n = $n + 1;
+    var n: Whole = 0;
+    while n < 3:
+        show_msg(be.Text(n));
+        n = n + 1;
     end while
-    var $m: Whole = 10;
+    var m: Whole = 10;
     while true:
-        if $m eq 12:
+        if m eq 12:
             break;
         else:
-            $m = $m + 1;
+            m = m + 1;
         end if
     end while
-    show_msg(be.Text($m));
+    show_msg(be.Text(m));
 end proc.main

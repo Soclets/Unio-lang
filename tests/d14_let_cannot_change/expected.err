@@ -1,8 +1,8 @@
 refused: program.unio:3:5, line 3 column 5
- 3 |     $lives = $lives - 1;
-   |     ^^^^^^
- what:    `$lives` can't be given a new value
+ 3 |     lives = lives - 1;
+   |     ^^^^^
+ what:    `lives` can't be given a new value
  because: line 2 declares it with `let`
- 2 |     let $lives: Whole = 3;
+ 2 |     let lives: Whole = 3;
    |     ^^^
  why:     only a `var` can be given a new value.

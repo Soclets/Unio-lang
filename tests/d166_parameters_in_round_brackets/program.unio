@@ -1,8 +1,8 @@
-proc add($a: Whole, $b: Whole) -> Whole:
-    return $a + $b;
+proc add(a: Whole, b: Whole) -> Whole:
+    return a + b;
 end proc add
 
 proc.main:
-    let $sum: Whole = add(1, 2);
-    show_msg(be.Text($sum));
+    let sum: Whole = add(1, 2);
+    show_msg(be.Text(sum));
 end proc.main

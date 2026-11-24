@@ -1,8 +1,8 @@
 proc.main:
-    let $name: Text = "Mia";
+    let name: Text = "Mia";
     show_msg("She said \"hi\".");
     show_msg("a\\b");
-    show_msg.fmt("Type \{help}, {$name}.");
+    show_msg.fmt("Type \{help}, {name}.");
     show_msg.fmt("a } b");
     show_msg("Don't stop");
 end proc.main

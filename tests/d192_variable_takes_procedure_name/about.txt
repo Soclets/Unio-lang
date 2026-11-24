@@ -1,0 +1,1 @@
+A variable can't take a procedure's name, with because pointing at the procedure. D94, D102, D192; standard ch. 3, 6 and 11.

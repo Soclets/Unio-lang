@@ -1,8 +1,8 @@
 proc.main:
-    let $share: Float = 10.0 / 3.0;
-    show_msg(be.Text($share));
-    let $quarter: Float = 1.0 / 4.0;
-    show_msg(be.Text($quarter));
-    let $half: Float = 7.0 / 2.0;
-    show_msg.fmt("{$half, places: 1}");
+    let share: Float = 10.0 / 3.0;
+    show_msg(be.Text(share));
+    let quarter: Float = 1.0 / 4.0;
+    show_msg(be.Text(quarter));
+    let half: Float = 7.0 / 2.0;
+    show_msg.fmt("{half, places: 1}");
 end proc.main

@@ -1,1 +1,1 @@
-A name in use can't be declared again, with because pointing at the first declaration. D94, D102, D125; standard ch. 6 and 11.
+A name in use can't be declared again, with because pointing at the first declaration. D94, D102; standard ch. 6 and 11.

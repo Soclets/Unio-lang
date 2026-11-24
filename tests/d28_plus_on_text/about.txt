@@ -1,1 +1,1 @@
-+ on two pieces of text is refused, with & as the fix. D27, D28, D54, D84, D86, D87, D125; standard ch. 7 and 11.
++ on two pieces of text is refused, with & as the fix. D27, D28, D54, D84, D86, D87, D192; standard ch. 7 and 11.

@@ -1,10 +1,10 @@
 proc.main:
-    let $name: Text = "Mia";
-    let $tries: Whole = 4;
-    show_msg.fmt("{$name} got it in {$tries} tries.");
-    let $line: Text = be.Text.fmt("{$name}: {$tries}");
-    show_msg($line);
-    show_msg("{$tries} stays plain");
-    show_msg.fmt.same_line("Lives: {$tries}, ");
+    let name: Text = "Mia";
+    let tries: Whole = 4;
+    show_msg.fmt("{name} got it in {tries} tries.");
+    let line: Text = be.Text.fmt("{name}: {tries}");
+    show_msg(line);
+    show_msg("{tries} stays plain");
+    show_msg.fmt.same_line("Lives: {tries}, ");
     show_msg("go");
 end proc.main

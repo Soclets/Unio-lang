@@ -1,10 +1,10 @@
 proc.main:
-    let $nine: Float = sqrt(9.0);
-    show_msg(be.Text($nine));
-    let $two: Float = sqrt(2.0);
-    show_msg(be.Text($two));
-    let $dx: Float = 3.0;
-    let $dy: Float = 4.0;
-    let $distance: Float = sqrt($dx * $dx + $dy * $dy);
-    show_msg.fmt("Distance: {$distance}");
+    let nine: Float = sqrt(9.0);
+    show_msg(be.Text(nine));
+    let two: Float = sqrt(2.0);
+    show_msg(be.Text(two));
+    let dx: Float = 3.0;
+    let dy: Float = 4.0;
+    let distance: Float = sqrt(dx * dx + dy * dy);
+    show_msg.fmt("Distance: {distance}");
 end proc.main

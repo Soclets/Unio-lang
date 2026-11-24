@@ -1,8 +1,8 @@
-proc count[$n: Whole]:
-    if $n > 0:
-        show_msg.fmt("down {$n}");
-        count($n - 1);
-        show_msg.fmt("up {$n}");
+proc count[n: Whole]:
+    if n > 0:
+        show_msg.fmt("down {n}");
+        count(n - 1);
+        show_msg.fmt("up {n}");
     end if
 end proc count
 

@@ -1,1 +1,1 @@
-A check failing while the output's line is open ends that line on standard output first, then the message goes to standard error. D46, D92, D104, D125; standard ch. 11.
+A check failing while the output's line is open ends that line on standard output first, then the message goes to standard error. D46, D92, D104, D192; standard ch. 11.

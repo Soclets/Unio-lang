@@ -1,11 +1,11 @@
-proc noisy[$value: Bool] -> Bool:
+proc noisy[value: Bool] -> Bool:
     show_msg("ran");
-    return $value;
+    return value;
 end proc noisy
 
 proc.main:
-    let $a: Bool = false;
-    if $a and noisy(true):
+    let a: Bool = false;
+    if a and noisy(true):
         show_msg("yes");
     else:
         show_msg("no");
@@ -13,7 +13,7 @@ proc.main:
     if true or noisy(true):
         show_msg("or stopped early");
     end if
-    if not $a and true or false:
+    if not a and true or false:
         show_msg("order ok");
     end if
 end proc.main

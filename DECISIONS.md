@@ -2968,7 +2968,7 @@ means. The compiler session asked (its Q12).
 **Tankun's words.** Asked "Names in use can't be declared again, and a variable can't take a procedure's name?" with
 `shadow` as the alternative, the owner chose: "yea"; then, asked to confirm it was the first, the owner chose: "yea".
 
-(The second half, a variable can't take a procedure's name, is replaced by D127.)
+(The second half, a variable can't take a procedure's name, is replaced by D127, then restored by D192.)
 
 ## D95. Which text `be.Whole` reads
 
@@ -3978,6 +3978,8 @@ being rewritten from a clean start (2026-11-21), nothing built has to change.
 **Tankun's words.** "yea. Mf, yk? I'm missing `$`, and `$a: Whole, $b: Whole`" (in answer to a question about Verus),
 then, asked "Should `$` come back on every name, replacing D58?", the owner chose: "yea".
 
+(Replaced by D192: names have no `$` again.)
+
 ## D126. Every parameter writes its own type after its name
 
 2026-11-20.
@@ -4022,6 +4024,8 @@ gives its value reads naturally.
 
 **Tankun's words.** Asked "Should a variable be allowed to share a procedure's name, now that `$` keeps them apart?",
 the owner chose: "yea".
+
+(Replaced by D192: without `$`, a variable can't take a procedure's name, as D94 had it.)
 
 ## D128. One or two calls are written as calls; three or more in a chain are a slide
 
@@ -4240,6 +4244,8 @@ printed wrong.
 
 **Tankun's words.** Asked "Should `{name}` without `$` in `.fmt` text be refused, with the `$` added as its fix?", the
 owner chose: "yea".
+
+(Replaced by D192: braces hold the bare name, since names have no `$`.)
 
 ## D134. A program may hold at most 30% of the machine's memory
 
@@ -5845,3 +5851,48 @@ fast one second, which suits Unio, whose implementations are built as a pair.
 **Tankun's words.** "Any new compiler names?", "I meant Unio's", "`Beta++`?
 Impl in C++, and is the second impl.", "What is c letter full name? Cockimus?", "Gamma means three? Shit, why is it not
 cm", then, asked "Should Unio's compiler be renamed from `Unlo\n` to `Beta++`?", the owner chose: "Yea".
+
+## D192. Names have no `$` again, and the `unio` command and the docs colour code
+
+2026-11-24.
+
+**Chosen.** A variable's name, a parameter's included, is a plain word with no mark, replacing D125:
+
+```
+let secret: Whole = random(from: 1, to: 100);
+var tries: Whole = 0;
+tries = tries + 1;
+show_msg.fmt("You got it in {tries} tries.");
+proc add[a: Whole, b: Whole] -> Whole:
+```
+
+What follows from it:
+- **A name can't be a keyword,** a variable's or a procedure's, as D58 had it: `let if: Whole = 1;` is refused, with
+  D87's wording. A keyword added later breaks programs already using that word as a name.
+- **A variable can't take a procedure's name,** D94's second half again, replacing D127: `let roll: Whole = roll();`
+  is refused, with D102's wording.
+- **`.fmt`'s braces hold the bare name,** as in `{tries}`. D133's refusal of a name without `$` goes.
+- **The `unio` command and the docs colour code** wherever they show it, so names, keywords, procedures, methods and
+  types look different. Which colours, and when the command uses them, aren't decided yet.
+
+**Weighed.**
+- Keeping `$` (D125). Names, keywords and methods stay apart in text with no colour, in chats, screenshots and plain
+  terminals, as in `if $hp eq $max and not $won:`, and in `$scores.len` beside `show_msg.fmt`. Shown the same program
+  four ways, with and without `$`, plain and highlighted, Tankun found the highlighted one without `$` the easiest to
+  read.
+- Dropping `$` with no promise of colour. Where Unio's code shows up bare, words like `eq`, `and` and `not` blend into
+  the names around them.
+
+**Why this won.** With colour, `$` does work the colours already do, and D58's reason, that code is mostly read where
+it can be coloured, still holds. Making colour part of Unio's own command and docs covers the places a learner reads
+code first. Nothing built has to change: Ralph's next prompt isn't pasted yet, and the tests and the standard change
+with this entry. The costs are D58's: names can't be keywords, a new keyword can break programs, and a variable can't
+share a procedure's name.
+
+**Tankun's words.** "Honestly? Not really, thinking again. Having Unio add var type infer, and removing `$` would
+likely do it. But we already did `$` and came back. So, I might look like I'm fucking mental. It was with methods,
+right? Like, wait, don't they have `()`?", "But highlighting solves it, though. But yk? I'd rather see both side by
+side, with and without highlighting. And btw, don't use the logo tool thingy, them fucking makers used a fucking shit
+prompt", "No fucking way, highlighting absolutely blessed my eyes, even without sigil", then, asked "Should `$` go,
+replacing D125, with the `unio` command and docs colouring code?", the owner chose: "yea. But what colors do we use,
+are there a standard?"

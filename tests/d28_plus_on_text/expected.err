@@ -1,5 +1,5 @@
 refused: program.unio:3:20, line 3 column 20
- 3 |     show_msg("Hi " + $name);
+ 3 |     show_msg("Hi " + name);
    |                    ^
- fix:     `    show_msg("Hi " & $name);`
+ fix:     `    show_msg("Hi " & name);`
  why:     `+` is only for numbers, and `&` joins text.

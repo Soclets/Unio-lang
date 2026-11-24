@@ -59,9 +59,9 @@ one of them changes, and only then does that one get its own copy, which is copy
 the difference, since it behaves exactly as if each variable had its own copy all along:
 
 ```
-var $a: List<Whole> = [1, 2, 3];
-var $b: List<Whole> = $a;   // shared, nothing copied yet
-$b.add(4);                  // $b gets its own copy first; $a is still [1, 2, 3]
+var a: List<Whole> = [1, 2, 3];
+var b: List<Whole> = a;   // shared, nothing copied yet
+b.add(4);                  // b gets its own copy first; a is still [1, 2, 3]
 ```
 
 A program may hold at most 30% of the machine's memory, with no settings (D134). Running out stops the program

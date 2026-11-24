@@ -1,13 +1,13 @@
 proc.main:
-    for each $even in range[from: 0, to: 9, step_by: 2]:
-        show_msg.same_line(be.Text($even));
+    for each even in range[from: 0, to: 9, step_by: 2]:
+        show_msg.same_line(be.Text(even));
         show_msg.same_line(" ");
     end for
     show_msg("");
-    for each $count in range[from: 3, to: 1, step_by: -1]:
-        show_msg(be.Text($count));
+    for each count in range[from: 3, to: 1, step_by: -1]:
+        show_msg(be.Text(count));
     end for
-    for each $back in range[from: 10, before: 0, step_by: -5]:
-        show_msg(be.Text($back));
+    for each back in range[from: 10, before: 0, step_by: -5]:
+        show_msg(be.Text(back));
     end for
 end proc.main

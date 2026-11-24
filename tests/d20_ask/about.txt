@@ -1,1 +1,1 @@
-ask showing a question and giving back the typed line as Text, be.Whole converting it, and ?? using a fallback when it fails. D20, D22, D23, D29, D125; standard ch. 4, 7 and 8.
+ask showing a question and giving back the typed line as Text, be.Whole converting it, and ?? using a fallback when it fails. D20, D22, D23, D29, D192; standard ch. 4, 7 and 8.

@@ -5,7 +5,7 @@ that can fail says so, and every call to it must deal with the failure, or the p
 (D23).
 
 ```
-let $guess: Whole = be.Whole($typed);
+let guess: Whole = be.Whole(typed);
 ```
 
 On its own, that line is refused, since `be.Whole` can fail and nothing handles it.
@@ -16,8 +16,8 @@ A procedure that can fail lists its failures at the end of its header, after `!`
 after `-> Type` when it gives back a value (D38, D39, D190):
 
 ```
-proc load_level[$name: Text] -> Level ! [not_found, broken]:
-proc save_game[$state: Text] ! [disk_full]:
+proc load_level[name: Text] -> Level ! [not_found, broken]:
+proc save_game[state: Text] ! [disk_full]:
 ```
 
 A failure's name is a plain word, like `not_found` (D39).
@@ -27,7 +27,7 @@ A failure's name is a plain word, like `not_found` (D39).
 `?` passes the failure up to whoever called this procedure, which must list that failure itself (D23):
 
 ```
-let $level: Text = load_text("level1.txt")?;
+let level: Text = load_text("level1.txt")?;
 ```
 
 ## `??`
@@ -43,9 +43,9 @@ call ?? crash
 where `call` is the call that can fail, and `value` the value to carry on with instead.
 
 ```
-let $guess: Whole = be.Whole($typed) ?? 0;
-save_text($line, "save.txt") ?? ignore;
-load_level($name) ?? crash;
+let guess: Whole = be.Whole(typed) ?? 0;
+save_text(line, "save.txt") ?? ignore;
+load_level(name) ?? crash;
 ```
 
 - **`?? value`** carries on with that value.
@@ -69,7 +69,7 @@ where `call` is the call that can fail, each `failure` one of its failures' name
 for it.
 
 ```
-let $best: Whole = load_best_score() otherwise:
+let best: Whole = load_best_score() otherwise:
     case not_found:
         show_msg("No high score yet.");
         instead 0;
@@ -85,7 +85,7 @@ end otherwise
   `end otherwise` (D186):
 
 ```
-$bag.add("Gem") otherwise:
+bag.add("Gem") otherwise:
     case full:
         show_msg("Your bag is full!");
 end otherwise
@@ -113,7 +113,7 @@ It's used with `otherwise` and its full name, as if its cases were written at th
 failure still possible there (D40, D42):
 
 ```
-let $title: Text = first_word($heading) otherwise word_failed.use_placeholder;
+let title: Text = first_word(heading) otherwise word_failed.use_placeholder;
 ```
 
 A handler that can `return` or `break` is marked `*` where it's used, as in `otherwise word_failed.*give_up;`. The mark
@@ -123,7 +123,7 @@ Inside an `otherwise:` block, `include family.handler;` brings in a handler's ca
 block's own `case`s cover the failures it doesn't. Together they must cover every failure, none twice (D43):
 
 ```
-let $title: Text = load_word($file) otherwise:
+let title: Text = load_word(file) otherwise:
     include word_failed.use_placeholder;
     case disk_full:
         instead "?";
@@ -133,7 +133,7 @@ end otherwise
 A handler can take parameters, written as a procedure's are, and is given arguments where it's used (D44):
 
 ```
-let $title: Text = first_word($heading) otherwise word_failed.use_default(with: "Untitled");
+let title: Text = first_word(heading) otherwise word_failed.use_default(with: "Untitled");
 ```
 
 **Not decided:** how a procedure fails on purpose; `return`; whether failing on purpose inside a case counts as a jump.

@@ -1,6 +1,6 @@
 proc.main:
-    let $low: Whole = 7;
-    let $high: Whole = 3;
-    let $roll: Whole = random(from: $low, to: $high);
-    show_msg(be.Text($roll));
+    let low: Whole = 7;
+    let high: Whole = 3;
+    let roll: Whole = random(from: low, to: high);
+    show_msg(be.Text(roll));
 end proc.main

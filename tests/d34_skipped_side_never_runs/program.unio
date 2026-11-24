@@ -1,5 +1,5 @@
-proc forever[$n: Whole] -> Bool:
-    return forever($n);
+proc forever[n: Whole] -> Bool:
+    return forever(n);
 end proc forever
 
 proc.main:

@@ -1,0 +1,7 @@
+proc double[n: Whole] -> Whole:
+    return n * 2;
+end proc double
+
+proc.main:
+    let double: Whole = 4;
+end proc.main

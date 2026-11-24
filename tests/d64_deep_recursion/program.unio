@@ -1,8 +1,8 @@
-proc sum_to[$n: Whole] -> Whole:
-    if $n < 1:
+proc sum_to[n: Whole] -> Whole:
+    if n < 1:
         return 0;
     else:
-        return $n + sum_to($n - 1);
+        return n + sum_to(n - 1);
     end if
 end proc sum_to
 

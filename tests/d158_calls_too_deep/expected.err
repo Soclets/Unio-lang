@@ -1,6 +1,6 @@
 check failed: program.unio:2:12, line 2 column 12
- 2 |     return count($n + 1);
-   |            ^^^^^^^^^^^^^
+ 2 |     return count(n + 1);
+   |            ^^^^^^^^^^^^
  what:    calls went too deep
  when:    1000000 calls deep, inside `count`
  why:     every call still waiting for another needs a little memory, and the room for them is limited; a procedure that keeps calling itself without stopping fills it.

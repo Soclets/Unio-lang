@@ -35,14 +35,14 @@ A range is gone through with `for each` (D171).
 ## `sqrt`
 
 ```
-sqrt($x)
+sqrt(x)
 ```
 
-where `$x` is a `Float`. It gives the square root, the nearest `Float` to the true answer, the same on every machine,
+where `x` is a `Float`. It gives the square root, the nearest `Float` to the true answer, the same on every machine,
 since IEEE 754 requires it as it does for `+` (D163, D185):
 
 ```
-let $distance: Float = sqrt($dx * $dx + $dy * $dy);
+let distance: Float = sqrt(dx * dx + dy * dy);
 ```
 
 - **A negative number stops the program** with a failed check and status 4, since its square root isn't a real number
@@ -54,14 +54,14 @@ let $distance: Float = sqrt($dx * $dx + $dy * $dy);
 ## `random`
 
 ```
-random(from: $low, to: $high)
+random(from: low, to: high)
 ```
 
-where `$low` and `$high` are whole numbers. It gives a whole number from `$low` to `$high`, both included, each equally
+where `low` and `high` are whole numbers. It gives a whole number from `low` to `high`, both included, each equally
 likely (D26).
 
 ```
-let $secret: Whole = random(from: 1, to: 100);
+let secret: Whole = random(from: 1, to: 100);
 ```
 
 It's game randomness, fine for dice and loot, not for anything that must be unguessable (D26).

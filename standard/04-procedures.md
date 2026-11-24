@@ -28,7 +28,7 @@ A procedure that gives back a value says so at the end of its header, with `->` 
 A procedure that gives nothing back writes no `->` (D38, D190):
 
 ```
-proc greet[$name: Text]:
+proc greet[name: Text]:
 ```
 
 Using what such a procedure gives as a value is refused (D38).
@@ -44,14 +44,14 @@ Using what such a procedure gives as a value is refused (D38).
 
 ### Parameters
 
-Each parameter is written as its name, with its `$`, then `:` and its type, as a declaration is, even when several share
-a type (D125, D126). Writing a shared type once in front, as in `proc add[Whole a, b]`, is refused (D126): A plain
+Each parameter is written as its name, then `:` and its type, as a declaration is, even when several share
+a type (D126). Writing a shared type once in front, as in `proc add[Whole a, b]`, is refused (D126): A plain
 parameter is read-only, like a `let` (D147).
 
 ```
-proc add[$a: Whole, $b: Whole] -> Whole:
-proc draw[$x: Whole, $name: Text]:
-proc double[$n: Whole] -> Whole:
+proc add[a: Whole, b: Whole] -> Whole:
+proc draw[x: Whole, name: Text]:
+proc double[n: Whole] -> Whole:
 ```
 
 Failures in a header: chapter 8.
@@ -87,11 +87,11 @@ where `kind` is what the family holds (`proc` for a procedure and its narrowings
 
 ```
 fam.proc show_msg:
-    proc show_msg[$text: Text]:
+    proc show_msg[text: Text]:
         ...
     end proc show_msg
 
-    proc show_msg.same_line[$text: Text]:
+    proc show_msg.same_line[text: Text]:
         ...
     end proc show_msg.same_line
 end fam.proc show_msg
@@ -113,20 +113,20 @@ Handler families: chapter 8.
 A call writes the procedure's name and `( )`, with its arguments inside, even when there are none (D3, D4):
 
 ```
-let $total: Whole = add(1, 2);
+let total: Whole = add(1, 2);
 show_score();
 ```
 
 A call that gives back a value has its value used: kept in a variable, passed on, or compared. One standing alone, its
 value thrown away, is refused; a call that gives nothing stands alone (D120). A line that only works out a value, like
-`$score + 1;`, is refused too (D161).
+`score + 1;`, is refused too (D161).
 
 ### Labels
 
 A procedure can give its arguments labels, and every call writes them, with `:` after each (D24):
 
 ```
-let $secret: Whole = random(from: 1, to: 100);
+let secret: Whole = random(from: 1, to: 100);
 ```
 
 - **The procedure's writer chooses each label.** A call can't leave one off, or write one the procedure doesn't have
@@ -143,13 +143,13 @@ where each `parameter` is one of the procedure's parameters and `label` the word
 the commas and the `;` are written as they are.
 
 ```
-proc random[$low: Whole, $high: Whole] -> Whole:
-    labels $low as from, $high as to;
+proc random[low: Whole, high: Whole] -> Whole:
+    labels low as from, high as to;
     ...
 end proc random
 ```
 
-where `...` stands for the rest of the body. Inside, the procedure uses `$low` and `$high`, and callers write `from:`
+where `...` stands for the rest of the body. Inside, the procedure uses `low` and `high`, and callers write `from:`
 and `to:` (D25).
 
 **Not decided:** defaults; label order.
@@ -171,8 +171,8 @@ A slide passes the value on the left of `|>` into the next step as its first arg
 in the order it runs (D5):
 
 ```
-$points |> double |> be.Text |> show_msg;
-$score |> clamp(min: 0, max: 100) |> be.Text |> show_msg;
+points |> double |> be.Text |> show_msg;
+score |> clamp(min: 0, max: 100) |> be.Text |> show_msg;
 ```
 
 When to slide is decided by length, so each chain has one spelling (D128): one or two calls are written as calls, and
@@ -180,13 +180,13 @@ three or more in a chain, each the first argument of the next, are written as a 
 
 ```
 show_msg("Hi");
-show_msg(be.Text($n));
-$points |> double |> be.Text |> show_msg;
+show_msg(be.Text(n));
+points |> double |> be.Text |> show_msg;
 ```
 
-So `$n |> be.Text |> show_msg` is refused, with `show_msg(be.Text($n))` as the fix, and
-`show_msg(be.Text(double($points)))` is refused, with the slide as the fix. When the innermost call takes one value,
-that value starts the fix's slide, as in `$points |> double`; when it takes more, the innermost call starts it whole, as
+So `n |> be.Text |> show_msg` is refused, with `show_msg(be.Text(n))` as the fix, and
+`show_msg(be.Text(double(points)))` is refused, with the slide as the fix. When the innermost call takes one value,
+that value starts the fix's slide, as in `points |> double`; when it takes more, the innermost call starts it whole, as
 in `larger(3, 9) |> be.Text |> show_msg`, since `3 |> larger(9)` would make its two values lopsided (D128).
 
 - **A step with nothing else to pass is bare,** with no `( )`: `|> be.Text`.
@@ -196,7 +196,7 @@ in `larger(3, 9) |> be.Text |> show_msg`, since `3 |> larger(9)` would make its 
 A step isn't a whole call, so it doesn't write `()` as a call does: the step names the procedure, and the slide calls
 it (D4, D5).
 
-`|>` comes last in the order of operators, so a slide takes everything on its left, as in `$a + 1 |> double |> be.Text
+`|>` comes last in the order of operators, so a slide takes everything on its left, as in `a + 1 |> double |> be.Text
 |> show_msg` (D73).
 
 **Not decided:** `clamp`, which the example uses.
@@ -223,7 +223,7 @@ ask(question)
 where `question` is the text shown.
 
 ```
-let $typed: Text = ask("Your guess: ");
+let typed: Text = ask("Your guess: ");
 ```
 
 What's typed always comes back as text, even digits: typing `42` gives `"42"`, not the number 42 (D20).

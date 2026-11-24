@@ -1,5 +1,5 @@
-refused: program.unio:2:24, line 2 column 24
- 2 |     let $roll: Whole = random(from: 6, to: 1);
-   |                        ^^^^^^^^^^^^^^^^^^^^^^
- fix:     `    let $roll: Whole = random(from: 1, to: 6);`
+refused: program.unio:2:23, line 2 column 23
+ 2 |     let roll: Whole = random(from: 6, to: 1);
+   |                       ^^^^^^^^^^^^^^^^^^^^^^
+ fix:     `    let roll: Whole = random(from: 1, to: 6);`
  why:     `random` gives a whole number from `from:` up to `to:`, so `from:` can't be above `to:`.

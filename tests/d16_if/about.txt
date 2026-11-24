@@ -1,1 +1,1 @@
-if, else if, else and end if, with <, >, at_least, at_most and !=. D16, D17, D125; standard ch. 5.
+if, else if, else and end if, with <, >, at_least, at_most and !=. D16, D17, D192; standard ch. 5.

@@ -1,1 +1,1 @@
-let, var, changing with =, and +, - and * on Whole, with a negative written -4. D13, D14, D15, D22, D27, D59, D125; standard ch. 6 and 7.
+let, var, changing with =, and +, - and * on Whole, with a negative written -4. D13, D14, D15, D22, D27, D59, D192; standard ch. 6 and 7.

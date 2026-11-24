@@ -1,8 +1,8 @@
 proc.main:
-    let $price: Whole = 12;
-    let $count: Whole = 3;
-    var $total: Whole = $price * $count;
-    $total = $total - 6;
-    $total = $total + -4;
-    show_msg(be.Text($total));
+    let price: Whole = 12;
+    let count: Whole = 3;
+    var total: Whole = price * count;
+    total = total - 6;
+    total = total + -4;
+    show_msg(be.Text(total));
 end proc.main

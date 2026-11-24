@@ -1,5 +1,5 @@
-proc count[$n: Whole] -> Whole:
-    return count($n + 1);
+proc count[n: Whole] -> Whole:
+    return count(n + 1);
 end proc count
 
 proc.main:

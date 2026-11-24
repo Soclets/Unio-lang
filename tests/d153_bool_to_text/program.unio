@@ -1,6 +1,6 @@
 proc.main:
-    let $won: Bool = true;
-    let $lost: Bool = false;
-    show_msg("Won: " & be.Text($won));
-    show_msg("Lost: " & be.Text($lost));
+    let won: Bool = true;
+    let lost: Bool = false;
+    show_msg("Won: " & be.Text(won));
+    show_msg("Lost: " & be.Text(lost));
 end proc.main

@@ -2,11 +2,11 @@
 
 ```
 refused: game.unio:5:5, line 5 column 5
- 5 |     $lives = $lives - 1;
-   |     ^^^^^^
- what:    `$lives` can't be given a new value
+ 5 |     lives = lives - 1;
+   |     ^^^^^
+ what:    `lives` can't be given a new value
  because: line 2 declares it with `let`
- 2 |     let $lives: Whole = 3;
+ 2 |     let lives: Whole = 3;
    |     ^^^
  why:     only a `var` can be given a new value.
 ```

@@ -1,5 +1,0 @@
-refused: program.unio:3:34, line 3 column 34
- 3 |     show_msg.fmt("You got it in {tries} tries.");
-   |                                  ^^^^^
- fix:     `    show_msg.fmt("You got it in {$tries} tries.");`
- why:     braces in `.fmt` text hold a variable's name, with its `$`.

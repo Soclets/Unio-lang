@@ -1,6 +1,6 @@
-check failed: program.unio:4:24, line 4 column 24
- 4 |     let $roll: Whole = random(from: $low, to: $high);
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+check failed: program.unio:4:23, line 4 column 23
+ 4 |     let roll: Whole = random(from: low, to: high);
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
  what:    `random`'s `from:` is above its `to:`
  when:    from: 7, to: 3
  why:     `random` gives a whole number from `from:` up to `to:`, so `from:` can't be above `to:`.

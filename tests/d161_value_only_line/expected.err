@@ -1,5 +1,5 @@
 refused: program.unio:3:5, line 3 column 5
- 3 |     $score + 1;
-   |     ^^^^^^^^^^
- what:    `$score + 1` works out a `Whole`, but nothing uses it
+ 3 |     score + 1;
+   |     ^^^^^^^^^
+ what:    `score + 1` works out a `Whole`, but nothing uses it
  why:     a line that only works out a value does nothing; keep the value with `let` or `var`, or give it to a variable with `=`.

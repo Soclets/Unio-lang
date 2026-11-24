@@ -1,1 +1,1 @@
-\ making the next character literal: \", \\ and \{, and a lone } in .fmt text. D21, D29, D30, D125; standard ch. 7.
+\ making the next character literal: \", \\ and \{, and a lone } in .fmt text. D21, D29, D30, D192; standard ch. 7.

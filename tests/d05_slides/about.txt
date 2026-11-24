@@ -1,1 +1,1 @@
-Slides: |> passing a value in as each step's first argument, with bare steps and a step with labels. D5, D24, D25, D125, D126, D128, D165; standard ch. 4.
+Slides: |> passing a value in as each step's first argument, with bare steps and a step with labels. D5, D24, D25, D126, D128, D165, D192; standard ch. 4.

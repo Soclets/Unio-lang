@@ -1,8 +1,8 @@
 proc.main:
-    for each $round in range[from: 1, to: 3]:
-        show_msg.fmt("Round {$round}");
+    for each round in range[from: 1, to: 3]:
+        show_msg.fmt("Round {round}");
     end for
-    for each $i in range[from: 0, before: 3]:
-        show_msg(be.Text($i));
+    for each i in range[from: 0, before: 3]:
+        show_msg(be.Text(i));
     end for
 end proc.main
