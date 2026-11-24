@@ -3,7 +3,7 @@
    The built-in procedures (D6, D20, D22, D26, D196) are known by their word: `show_msg`, `be`, `ask` and `random`.
    Any other word names one of the program's own procedures. *)
 
-From Stdlib Require Import String List Bool.
+From Stdlib Require Import String Ascii List Bool.
 From Ralph Require Import Syntax Diagnostics TypedTree Float.
 Import ListNotations.
 Open Scope string_scope.
@@ -33,9 +33,36 @@ Definition named (name : string) (d : definition) : bool :=
 Definition is_main (d : definition) : bool :=
   match definition_name d with Main => true | Named _ => false end.
 
-Definition find_definition (p : program) (name : string) : option definition := find (named name) p.
+Definition find_definition (p : program) (name : string) : option definition := find (named name) (program_definitions p).
 
-Definition find_main (p : program) : option definition := find is_main p.
+Definition find_main (p : program) : option definition := find is_main (program_definitions p).
+
+Definition find_handler (p : program) (name : string) : option handler :=
+  find (fun h => String.eqb (handler_name h) name) (program_handlers p).
+
+(* The word of a name, before its first `.`, as `show_msg` in `show_msg.same_line` (D41). *)
+Fixpoint word_of (name : string) : string :=
+  match name with
+  | EmptyString => EmptyString
+  | String c rest => if Ascii.eqb c "."%char then EmptyString else String c (word_of rest)
+  end.
+
+(* trace: D41. The kinds a family's word has among the program's procedures, as `same_line` for `show_msg`. *)
+Definition kinds_of (p : program) (word : string) : list string :=
+  flat_map
+    (fun d =>
+       match definition_name d with
+       | Named n =>
+           if String.eqb (word_of n) word && negb (String.eqb n word)
+           then [substring (String.length word + 1) (String.length n) n] else []
+       | Main => []
+       end)
+    (program_definitions p).
+
+(* Whether a word names one of the program's own procedures, or a family of them. *)
+Definition is_procedure_word (p : program) (word : string) : bool :=
+  existsb (fun d => match definition_name d with Named n => String.eqb (word_of n) word | Main => false end)
+    (program_definitions p).
 
 (* A word that can't be narrowed: every library word but `show_msg` and `be`, and every procedure of the program's
    own, since families aren't built (D41). *)
@@ -58,6 +85,10 @@ Fixpoint written_twice (seen : list string) (narrowings : list (string * place))
   | (n, at_) :: rest =>
       if existsb (String.eqb n) seen then Some (n, at_) else written_twice (n :: seen) rest
   end.
+
+(* A callee's name as written, as in `show_msg.same_line`, for messages. *)
+Definition callee_name (c : callee) : string :=
+  fold_left (fun so_far narrowing => so_far ++ "." ++ fst narrowing) (callee_narrowings c) (callee_word c).
 
 (* trace: D6, D102 *)
 Definition resolve_show (c : callee) : resolution :=
@@ -125,18 +156,26 @@ Definition resolve (p : program) (c : callee) : resolution :=
   (* trace: D185 *)
   else if String.eqb word "sqrt" then plain c (Library Square_root)
   else
-    match find_definition p word with
-    | Some d => plain c (User d)
-    | None => Unresolved [Refused (Unknown_procedure word (callee_word_at c))]
+    (* trace: D41. A narrowed call names a member of its word's family by its full name. *)
+    match callee_narrowings c with
+    | [] =>
+        match find_definition p word with
+        | Some d => Resolved (User d)
+        | None => Unresolved [Refused (Unknown_procedure word (callee_word_at c))]
+        end
+    | (n, at_) :: _ =>
+        match find_definition p (callee_name c) with
+        | Some d => Resolved (User d)
+        | None =>
+            if is_procedure_word p word then Unresolved [Refused (Unknown_narrowing word n at_ (kinds_of p word))]
+            else Unresolved [Refused (Unknown_procedure word (callee_word_at c))]
+        end
     end.
 
 (* A procedure's name for messages: `proc.main`, or its own name. *)
 Definition procedure_label (d : definition) : string :=
   match definition_name d with Main => "proc.main" | Named n => n end.
 
-(* A callee's name as written, as in `show_msg.same_line`, for messages. *)
-Definition callee_name (c : callee) : string :=
-  fold_left (fun so_far narrowing => so_far ++ "." ++ fst narrowing) (callee_narrowings c) (callee_word c).
 
 (* A procedure's labels, from the `labels` line that's the first line of its body (D25). *)
 Definition definition_labels (d : definition) : list label_pair :=

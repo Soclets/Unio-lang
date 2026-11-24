@@ -383,6 +383,29 @@ let refusal source (r : Core.refusal) : M.message =
         ~why:
           "`instead` gives the value to carry on with when a call fails; after one that gives \
            nothing, a case just ends."
+  (* trace: D41, D42, D43. Drafts. *)
+  | Core.Unknown_handler (name, p) ->
+      refused p
+        ~what:(Printf.sprintf "there's no handler named %s" (quoted name))
+        ~why:"a handler is declared with `handler`, inside a `fam.handler` block."
+  | Core.Handler_jump_unmarked (name, p) ->
+      let word, kind = match String.index_opt name '.' with Some i -> (String.sub name 0 i, String.sub name (i + 1) (String.length name - i - 1)) | None -> (name, "") in
+      refused p
+        ~fix:(M.replace_at (line_of source p) p.place_column p.place_width (word ^ ".*" ^ kind))
+        ~why:"a handler that can `return` or `break` is marked `.*` where it's used, so the jump shows at the call."
+  | Core.Handler_jump_marked (name, p) ->
+      refused p
+        ~fix:(M.replace_at (line_of source p) p.place_column p.place_width name)
+        ~why:"only a handler that can `return` or `break` is marked `.*`."
+  | Core.Narrowed_outside_family (name, p) ->
+      let word = match String.index_opt name '.' with Some i -> String.sub name 0 i | None -> name in
+      refused p
+        ~what:(Printf.sprintf "%s is a kind of %s, so it's declared inside %s" (quoted name) (quoted word) (quoted ("fam.proc " ^ word)))
+        ~why:"a narrowed procedure is declared inside its word's family, so every kind of it is in one place."
+  | Core.Member_of_other_family (name, family, p) ->
+      refused p
+        ~what:(Printf.sprintf "%s isn't %s or a kind of it" (quoted name) (quoted family))
+        ~why:"a family holds its word and the kinds of it."
   (* trace: D155. The fix adds the `~`; its `why:` is a draft. *)
   | Core.Approximate_literal p ->
       let w = Option.value (written source p) ~default:"" in
@@ -734,6 +757,8 @@ let not_designed (what : Core.not_designed) =
   | Core.Going_through_text -> "going through text with `for each`"
   | Core.Comparing_lists -> "comparing lists or arrays"
   | Core.Float_literal_out_of_range -> "writing a number too big for a `Float`"
+  | Core.Handler_including_handler -> "a handler that includes another"
+  | Core.Handler_arguments_calling -> "when a handler's arguments are worked out, when they call a procedure"
 
 (* Every core diagnostic as a message; [None] for a part the parser has already refused. *)
 let diagnostic source (d : Core.diagnostic) : M.message option =

@@ -64,6 +64,7 @@ type state = {
   mutable spread_reported : bool;
   mutable closers : string list;  (** the closers of the blocks open now, innermost first *)
   mutable last_code_line : int;  (** the last line whose indentation was checked *)
+  mutable handlers : Core.handler list;  (** the handlers read so far, last first (D42) *)
   mutable variables : string list;
       (** the names declared so far in this procedure, which a `.` or `[` after reads as a value's (D77, D79) *)
 }
@@ -781,7 +782,7 @@ let begin_line st (t : token) depth =
     (* Lines holding only a comment, since the last line checked. *)
     for number = st.last_code_line + 1 to t.line - 1 do
       let l = st.lines.(number - 1) in
-      if l.tokens = [] && l.comment then begin
+      if l.tokens = [] && l.comment && not l.hidden then begin
         (* trace: D145. Indented like the line after it, or one level in right before a closer or `else`. *)
         let content = String.trim l.text in
         let indent = String.length l.text - String.length content in
@@ -849,10 +850,14 @@ let closer_words st =
   in
   match peek st with Some t -> go t.line [] | None -> []
 
+(* A closer's words as written, with no spaces around a `.`, as in `end fam.proc show_msg`. *)
 let closer_text words =
-  match words with
-  | "end" :: "proc" :: "." :: rest -> "end proc." ^ String.concat "" rest
-  | _ -> String.concat " " words
+  let rec go acc = function
+    | [] -> acc
+    | "." :: next :: rest -> go (acc ^ "." ^ next) rest
+    | w :: rest -> go (if acc = "" then w else acc ^ " " ^ w) rest
+  in
+  go "" words
 
 (* trace: D8, D85, D87. Reads the closer [wanted] at [depth]. *)
 let parse_closer st depth wanted =
@@ -912,6 +917,21 @@ let plain_whole st =
   | _ ->
       expected st "a whole number";
       Error ()
+
+(* trace: D74. `comment name`, its hidden lines (Lexer.hide_comment_blocks), and `end comment name`. *)
+let parse_comment_block st (t : token) depth =
+  advance st;
+  match peek st with
+  | Some ({ kind = Word name; _ } as n) when n.line = t.line ->
+      advance st;
+      check_name st n name name;
+      expect_opener_end st;
+      st.closers <- ("end comment " ^ name) :: st.closers;
+      if not st.stopped then parse_closer st depth ("end comment " ^ name);
+      st.closers <- (match st.closers with _ :: rest -> rest | [] -> [])
+  | _ ->
+      expected st "the comment's name";
+      st.stopped <- true
 
 (* trace: D13, D15, D21, D33, D75, D161, D167 *)
 let rec parse_type st : Core.type0 parsed =
@@ -1121,6 +1141,10 @@ let rec parse_block st depth : Core.block =
       | Some t when is_word "end" t || is_word "else" t || is_word "case" t || is_word "include" t
         ->
           List.rev acc
+      | Some t when is_word "comment" t ->
+          begin_line st t depth;
+          parse_comment_block st t depth;
+          statements acc
       | Some t -> (
           begin_line st t depth;
           match parse_statement st t depth with
@@ -1204,10 +1228,6 @@ and parse_statement st (t : token) depth : Core.statement parsed =
         match operator with Some o -> place_of_token o | None -> place_of_token t
       in
       Ok (Core.Set_item (name, place_of_token t, label, label_at, index, value, operator_at, at))
-  | Word "comment" ->
-      not_built st t "block comments, `comment name` (D74),";
-      st.stopped <- true;
-      Error ()
   | Word name
     when (not (is_keyword name))
          && match peek_ahead st 1 with Some u -> is_symbol "=" u | None -> false ->
@@ -1248,10 +1268,16 @@ and with_otherwise st depth (start : token) attempt : Core.statement parsed =
   | Some o when is_word "otherwise" o -> (
       advance st;
       match peek st with
-      | Some h when h.line = o.line ->
-          not_built st h "handler families used with `otherwise`, and `include` (D42, D43, D44),";
-          st.stopped <- true;
-          Error ()
+      | Some h when h.line = o.line -> (
+          (* trace: D42, D44. `otherwise family.handler;`, its cases used as if written there. *)
+          match handler_use st with
+          | Some (name, name_at, jump, given, use_at) ->
+              let at = place_of (statement_span st start) in
+              expect_semicolon st;
+              Ok (Core.Handled (attempt, Core.Included (name, name_at, jump, given, use_at, Core.No_cases), place_of_token o, at))
+          | None ->
+              st.stopped <- true;
+              Error ())
       | _ ->
           let at = place_of (statement_span st start) in
           st.closers <- "end otherwise" :: st.closers;
@@ -1268,29 +1294,56 @@ and with_otherwise st depth (start : token) attempt : Core.statement parsed =
                       let case_at = place_of (statement_span st c) in
                       expect_opener_end st;
                       let body = parse_block st (depth + 2) in
-                      cases ((f, place_of_token ft, body, case_at) :: acc)
+                      cases (`Case (f, place_of_token ft, body, case_at) :: acc)
                   | _ ->
                       expected st "a failure's name";
                       st.stopped <- true;
                       List.rev acc)
-              | Some c when is_word "include" c ->
+              (* trace: D43 *)
+              | Some c when is_word "include" c -> (
                   begin_line st c (depth + 1);
-                  not_built st c
-                    "handler families used with `otherwise`, and `include` (D42, D43, D44),";
-                  st.stopped <- true;
-                  List.rev acc
+                  advance st;
+                  match handler_use st with
+                  | Some use ->
+                      expect_semicolon st;
+                      cases (`Include use :: acc)
+                  | None ->
+                      st.stopped <- true;
+                      List.rev acc)
               | _ -> List.rev acc
           in
           let found = cases [] in
           st.closers <- (match st.closers with _ :: rest -> rest | [] -> []);
           if not st.stopped then parse_closer st depth "end otherwise";
-          let handlers =
-            List.fold_right
-              (fun (f, f_at, body, case_at) rest -> Core.Case (f, f_at, body, case_at, rest))
-              found Core.No_cases
-          in
-          Ok (Core.Handled (attempt, handlers, place_of_token o, at)))
+          Ok (Core.Handled (attempt, fold_cases found, place_of_token o, at)))
   | _ -> Ok attempt
+
+and fold_cases found =
+  List.fold_right
+    (fun one rest ->
+      match one with
+      | `Case (f, f_at, body, case_at) -> Core.Case (f, f_at, body, case_at, rest)
+      | `Include (name, name_at, jump, given, use_at) -> Core.Included (name, name_at, jump, given, use_at, rest))
+    found Core.No_cases
+
+(* trace: D42, D44. A handler where it's used: `family.handler`, `family.*handler` for one that can jump, and its
+   arguments in `( )`. *)
+and handler_use st =
+  match (peek st, peek_ahead st 1, peek_ahead st 2) with
+  | Some ({ kind = Word word; _ } as w), Some d, Some ({ kind = Word name; _ } as n)
+    when is_symbol "." d || is_symbol ".*" d -> (
+      advance st;
+      advance st;
+      advance st;
+      let full = word ^ "." ^ name in
+      let name_at = place_of (join st (span_of w) (span_of n)) in
+      let given = if next_is st (is_symbol "(") then parse_arguments st else Ok (Core.No_arguments, span_of n) in
+      match given with
+      | Ok (given, close) -> Some (full, name_at, is_symbol ".*" d, given, place_of (join st (span_of w) close))
+      | Error () -> None)
+  | _ ->
+      expected st "a handler, as in `word_failed.use_placeholder`";
+      None
 
 (* trace: D171, D174. `for each item at pos i in source`, its body, and `end for`. *)
 and parse_for st (t : token) depth =
@@ -1511,8 +1564,8 @@ let parse_parameters st (open_bracket : token) : Core.parameter list parsed =
 
 (* trace: D4, D8, D37, D38, D58, D132, D165, D190, D199. `proc name[parameters] -> Type`, its body, and
    `end proc name`. *)
-let parse_definition st (keyword : token) : Core.definition option =
-  begin_line st keyword 0;
+let parse_definition st (keyword : token) depth (family : string option) : Core.definition option =
+  begin_line st keyword depth;
   advance st;
   let header =
     match peek st with
@@ -1533,7 +1586,22 @@ let parse_definition st (keyword : token) : Core.definition option =
                ~what:(Printf.sprintf "`%s` is a keyword, so it can't be a procedure's name" name)
                ~why:"a procedure's name can't be one of Unio's own words.")
         else check_name st t name name;
-        Some (Core.Named name, t, "end proc " ^ name)
+        (* trace: D41. `word.kind` names a kind of `word`, declared inside `fam.proc word`. *)
+        let name, span =
+          match (peek st, peek_ahead st 1) with
+          | Some d, Some ({ kind = Word kind; _ } as k) when is_symbol "." d ->
+              advance st;
+              advance st;
+              check_name st k kind kind;
+              (name ^ "." ^ kind, join st (span_of t) (span_of k))
+          | _ -> (name, span_of t)
+        in
+        let word = match String.index_opt name '.' with Some i -> String.sub name 0 i | None -> name in
+        (match family with
+        | Some f when f <> word -> report st (Wording.refusal [||] (Core.Member_of_other_family (name, f, place_of span)))
+        | None when word <> name -> report st (Wording.refusal [||] (Core.Narrowed_outside_family (name, place_of span)))
+        | _ -> ());
+        Some (Core.Named name, { t with width = span.stop - span.first }, "end proc " ^ name)
     | _ ->
         expected st "a procedure's name";
         None
@@ -1668,11 +1736,12 @@ let parse_definition st (keyword : token) : Core.definition option =
               if not st.stopped then expect_opener_end st;
               if st.stopped then None
               else begin
-                st.closers <- [ closer ];
+                let outer = st.closers in
+                st.closers <- closer :: outer;
                 st.variables <- List.map (fun (x : Core.parameter) -> x.parameter_name) parameters;
-                let body = parse_block st 1 in
-                st.closers <- [];
-                if not st.stopped then parse_closer st 0 closer;
+                let body = parse_block st (depth + 1) in
+                st.closers <- outer;
+                if not st.stopped then parse_closer st depth closer;
                 Some
                   {
                     Core.definition_name = name;
@@ -1685,12 +1754,132 @@ let parse_definition st (keyword : token) : Core.definition option =
                   }
               end))
 
+(* trace: D42, D43, D44. `handler word.kind[parameters]`, its `labels` line, its cases, and `end handler word.kind`. *)
+let parse_handler st (t : token) depth word =
+  begin_line st t depth;
+  advance st;
+  match (peek st, peek_ahead st 1, peek_ahead st 2) with
+  | Some ({ kind = Word w; _ } as wt), Some d, Some ({ kind = Word kind; _ } as k) when is_symbol "." d -> (
+      advance st;
+      advance st;
+      advance st;
+      check_name st k kind kind;
+      let name = w ^ "." ^ kind in
+      let name_at = place_of (join st (span_of wt) (span_of k)) in
+      if w <> word then report st (Wording.refusal [||] (Core.Member_of_other_family (name, word, name_at)));
+      let parameters = match peek st with Some o when is_symbol "[" o -> parse_parameters st o | _ -> Ok [] in
+      match parameters with
+      | Error () -> st.stopped <- true
+      | Ok parameters ->
+          let at = place_of (statement_span st t) in
+          expect_opener_end st;
+          st.variables <- List.map (fun (x : Core.parameter) -> x.parameter_name) parameters;
+          let closer = "end handler " ^ name in
+          let outer = st.closers in
+          st.closers <- closer :: outer;
+          let pairs =
+            match peek st with
+            | Some l when is_word "labels" l -> (
+                begin_line st l (depth + 1);
+                match parse_labels st l with Ok (Core.Labels (pairs, _)) -> pairs | _ -> [])
+            | _ -> []
+          in
+          let rec cases acc =
+            if st.stopped then List.rev acc
+            else
+              match peek st with
+              | Some c when is_word "case" c -> (
+                  begin_line st c (depth + 1);
+                  advance st;
+                  match peek st with
+                  | Some ({ kind = Word f; _ } as ft) ->
+                      advance st;
+                      let case_at = place_of (statement_span st c) in
+                      expect_opener_end st;
+                      let body = parse_block st (depth + 2) in
+                      cases (`Case (f, place_of_token ft, body, case_at) :: acc)
+                  | _ ->
+                      expected st "a failure's name";
+                      st.stopped <- true;
+                      List.rev acc)
+              | Some c when is_word "include" c -> (
+                  begin_line st c (depth + 1);
+                  advance st;
+                  match handler_use st with
+                  | Some use ->
+                      expect_semicolon st;
+                      cases (`Include use :: acc)
+                  | None ->
+                      st.stopped <- true;
+                      List.rev acc)
+              | _ -> List.rev acc
+          in
+          let found = cases [] in
+          st.closers <- outer;
+          if not st.stopped then parse_closer st depth closer;
+          st.handlers <-
+            {
+              Core.handler_name = name;
+              handler_name_at = name_at;
+              handler_parameters = parameters;
+              handler_labels = pairs;
+              handler_cases = fold_cases found;
+              handler_at = at;
+            }
+            :: st.handlers)
+  | _ ->
+      expected st "a handler's name, as in `word_failed.use_placeholder`";
+      st.stopped <- true
+
+(* trace: D41, D42. `fam.proc word` or `fam.handler word`, its members, and `end fam.proc word`. *)
+let parse_family st (t : token) =
+  begin_line st t 0;
+  advance st;
+  match (peek st, peek_ahead st 1, peek_ahead st 2) with
+  | Some d, Some { kind = Word (("proc" | "handler") as which); _ }, Some ({ kind = Word word; _ } as wt)
+    when is_symbol "." d ->
+      advance st;
+      advance st;
+      advance st;
+      check_name st wt word word;
+      expect_opener_end st;
+      let closer = "end fam." ^ which ^ " " ^ word in
+      st.closers <- [ closer ];
+      let rec members acc =
+        if st.stopped then List.rev acc
+        else
+          match peek st with
+          | Some m when is_word "proc" m && which = "proc" -> (
+              match parse_definition st m 1 (Some word) with
+              | Some def ->
+                  st.closers <- [ closer ];
+                  members (def :: acc)
+              | None -> List.rev acc)
+          | Some m when is_word "handler" m && which = "handler" ->
+              parse_handler st m 1 word;
+              st.closers <- [ closer ];
+              members acc
+          | Some m when is_word "comment" m ->
+              begin_line st m 1;
+              parse_comment_block st m 1;
+              members acc
+          | _ -> List.rev acc
+      in
+      let found = members [] in
+      st.closers <- [];
+      if not st.stopped then parse_closer st 0 closer;
+      found
+  | _ ->
+      expected st "`proc` or `handler`, as in `fam.proc show_msg`";
+      st.stopped <- true;
+      []
+
 (* trace: D97, D101, D102. Two or more blank lines in a row. *)
 let check_blank_lines st =
   let count = Array.length st.lines in
   let rec go i =
     if i < count then
-      if String.trim st.lines.(i).text = "" && not st.lines.(i).comment then begin
+      if String.trim st.lines.(i).text = "" && (not st.lines.(i).comment) && not st.lines.(i).hidden then begin
         let rec run_end j =
           if j < count && String.trim st.lines.(j).text = "" then run_end (j + 1) else j
         in
@@ -1781,17 +1970,37 @@ let parse ~file (lines : Lexer.line list) =
       closers = [];
       last_code_line = 0;
       variables = [];
+      handlers = [];
     }
   in
   List.iter (fun (_, m) -> Option.iter (report st) m) read;
   check_blank_lines st;
-  Array.iter
-    (fun (l : Lexer.line) ->
+  (* trace: D74. A `///` doc comment goes on the lines right before a declaration. *)
+  let count = Array.length lines in
+  Array.iteri
+    (fun i (l : Lexer.line) ->
       match l.doc_comment with
-      | Some column ->
-          report st
-            (M.message M.Not_built_yet (M.point l.number column 3)
-               ~what:"doc comments, `///` (D74), aren't built yet")
+      | Some column -> (
+          let rec next j =
+            if j >= count then None
+            else
+              let m = lines.(j) in
+              if m.tokens = [] && m.doc_comment <> None then next (j + 1) else Some m
+          in
+          let starts word (m : Lexer.line) = match m.tokens with first :: _ -> is_word word first | [] -> false in
+          match next (i + 1) with
+          | Some m when starts "let" m || starts "var" m || starts "proc" m -> ()
+          | Some m when starts "fam" m || starts "handler" m || starts "extern" m ->
+              report st
+                (M.message M.Not_designed_yet (M.point l.number column 3)
+                   ~what:"which declarations take a `///` doc comment isn't decided yet")
+          | _ ->
+              (* A draft wording. *)
+              report st
+                (M.message M.Refused (M.point l.number column 3)
+                   ~fix:(M.replace_at l.text column 3 "//")
+                   ~why:"a `///` describes the declaration on the line right after it; any other comment is written \
+                         with `//`."))
       | None -> ())
     lines;
   let rec definitions acc =
@@ -1800,19 +2009,16 @@ let parse ~file (lines : Lexer.line list) =
       match peek st with
       | None -> List.rev acc
       | Some t when is_word "proc" t -> (
-          match parse_definition st t with Some d -> definitions (d :: acc) | None -> List.rev acc)
+          match parse_definition st t 0 None with Some d -> definitions (d :: acc) | None -> List.rev acc)
       | Some t when is_word "extern" t ->
           not_built st t "procedures written in C++, `extern.cpp` (D36, D131),";
           st.stopped <- true;
           List.rev acc
-      | Some t when is_word "fam" t ->
-          not_built st t "families, `fam` (D41, D42),";
-          st.stopped <- true;
-          List.rev acc
+      | Some t when is_word "fam" t -> definitions (List.rev_append (parse_family st t) acc)
       | Some t when is_word "comment" t ->
-          not_built st t "block comments, `comment name` (D74),";
-          st.stopped <- true;
-          List.rev acc
+          begin_line st t 0;
+          parse_comment_block st t 0;
+          definitions acc
       | Some t ->
           (* trace: D161. Each statement outside a procedure is refused, and reading carries on. *)
           begin_line st t 0;
@@ -1841,4 +2047,4 @@ let parse ~file (lines : Lexer.line list) =
       done
   | _ -> ());
   let stop_line = match peek st with Some t when st.stopped -> t.line | _ -> max_int in
-  (found, List.rev st.problems, st.stopped, stop_line)
+  (found, List.rev st.handlers, List.rev st.problems, st.stopped, stop_line)

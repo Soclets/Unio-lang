@@ -530,9 +530,9 @@ Definition check_step (s : setting) (name : callee) (slid : option type) (slid_t
   | Resolved target => check_step_target (callee_name name) target slid slid_tree given at_
   end.
 
-(* A word that names a procedure, the program's own or a built-in. *)
+(* A word that names a procedure, the program's own or a built-in, or a family of them (D41). *)
 Definition procedure_named (p : program) (word : string) : bool :=
-  is_library_word word || match find_definition p word with Some _ => true | None => false end.
+  is_library_word word || is_procedure_word p word.
 
 Fixpoint argument_count (given : arguments) : Z :=
   match given with
@@ -1140,6 +1140,8 @@ with can_leave_cases (in_inner_loop : bool) (handlers : cases) : bool :=
   match handlers with
   | No_cases => false
   | Case _ _ body _ rest => can_leave_block in_inner_loop body || can_leave_cases in_inner_loop rest
+  | Included _ _ _ _ _ rest => can_leave_cases in_inner_loop rest
+  | Expanded _ _ _ _ _ _ _ inlined rest => can_leave_cases in_inner_loop inlined || can_leave_cases in_inner_loop rest
   end
 with can_leave_block (in_inner_loop : bool) (b : block) : bool :=
   match b with
@@ -1205,6 +1207,11 @@ with always_ends_case_else (e : else_part) : bool :=
 
 Definition declare (s : setting) (info : variable_info) : setting := with_scope s (info :: setting_scope s).
 
+Definition parameter_info (p : parameter) : variable_info :=
+  {| variable_name := parameter_name p; variable_type := parameter_type p; variable_kind := Parameter_variable;
+     variable_name_at := parameter_at p; variable_keyword_at := parameter_at p |}.
+
+
 (* The names a block declared, for D93's `because:` once it's ended. *)
 Definition declared_in (st : statement) : list (string * place) :=
   match st with
@@ -1212,11 +1219,84 @@ Definition declared_in (st : statement) : list (string * place) :=
   | _ => []
   end.
 
-(* trace: D94, D102, D192. A variable or parameter can't take a procedure's name. *)
+(* trace: D41, D94, D102, D192. A variable or parameter can't take a procedure's name, or its family's word. *)
 Definition procedure_name_taken (p : program) (name : string) (at_ : place) : list diagnostic :=
-  match find_definition p name with
+  match find (fun d => match definition_name d with Named n => String.eqb (word_of n) name | Main => false end)
+          (program_definitions p) with
   | Some d => [Refused (Name_is_procedure name at_ (Some (definition_name_at d)))]
   | None => if is_library_word name then [Refused (Name_is_procedure name at_ None)] else []
+  end.
+
+(* ---------------------------------------------------------------------------------------------------------------- *)
+(* Handlers (D42, D43, D44): each `include` and `otherwise family.handler` gets its handler's parameters, `labels` and
+   cases written in, so the checker reads them as if written there. A handler's own cases aren't expanded: a handler
+   including another isn't decided. *)
+
+Fixpoint expand_statement (p : program) (st : statement) {struct st} : statement :=
+  match st with
+  | If condition then_part rest at_ => If condition (expand_block p then_part) (expand_else p rest) at_
+  | While condition body at_ => While condition (expand_block p body) at_
+  | For_each item item_at position from_one source body at_ =>
+      For_each item item_at position from_one source (expand_block p body) at_
+  | Handled attempt handlers otherwise_at at_ => Handled attempt (expand_cases p handlers) otherwise_at at_
+  | other => other
+  end
+with expand_cases (p : program) (handlers : cases) {struct handlers} : cases :=
+  match handlers with
+  | No_cases => No_cases
+  | Case failure failure_at body at_ rest => Case failure failure_at (expand_block p body) at_ (expand_cases p rest)
+  | Included name name_at jump given at_ rest =>
+      match find_handler p name with
+      | Some h =>
+          Expanded name name_at jump given at_ (handler_parameters h) (handler_labels h) (handler_cases h)
+            (expand_cases p rest)
+      | None => Included name name_at jump given at_ (expand_cases p rest)
+      end
+  | Expanded name name_at jump given at_ parameters pairs inlined rest =>
+      Expanded name name_at jump given at_ parameters pairs inlined (expand_cases p rest)
+  end
+with expand_block (p : program) (b : block) {struct b} : block :=
+  match b with
+  | Empty => Empty
+  | Then st rest => Then (expand_statement p st) (expand_block p rest)
+  end
+with expand_else (p : program) (e : else_part) {struct e} : else_part :=
+  match e with
+  | No_else => No_else
+  | Else body at_ => Else (expand_block p body) at_
+  | Else_if condition body rest at_ => Else_if condition (expand_block p body) (expand_else p rest) at_
+  end.
+
+Fixpoint append_cases (a b : Typed.cases) : Typed.cases :=
+  match a with
+  | Typed.No_cases => b
+  | Typed.Case f body rest => Typed.Case f body (append_cases rest b)
+  end.
+
+Fixpoint before_block (first : list Typed.statement) (b : Typed.block) : Typed.block :=
+  match first with
+  | [] => b
+  | st :: rest => Typed.Then st (before_block rest b)
+  end.
+
+(* Each case of an included handler starts by giving its parameters their arguments (D44). *)
+Fixpoint with_parameters (declarations : list Typed.statement) (handlers : Typed.cases) : Typed.cases :=
+  match handlers with
+  | Typed.No_cases => Typed.No_cases
+  | Typed.Case f body rest => Typed.Case f (before_block declarations body) (with_parameters declarations rest)
+  end.
+
+(* Whether a value calls a procedure, so when it's worked out would show. *)
+Fixpoint calls_something (e : Typed.expression) : bool :=
+  match e with
+  | Typed.Value_of _ | Typed.Fallback _ _ => true
+  | Typed.Negate operand _ | Typed.Logic_not operand | Typed.Float_negate operand | Typed.Float_of operand
+  | Typed.Whole_of_float _ operand _ | Typed.Text_places _ operand | Typed.Text_of _ operand _ | Typed.Length operand
+  | Typed.All_literal _ operand => calls_something operand
+  | Typed.Maths _ l r _ | Typed.Divide _ l r _ | Typed.Float_maths _ l r _ | Typed.Compare _ _ l r
+  | Typed.Logic_and l r | Typed.Logic_or l r | Typed.Item _ l r _ => calls_something l || calls_something r
+  | Typed.Join parts | Typed.List_literal _ parts => existsb calls_something parts
+  | _ => false
   end.
 
 (* trace: D94. A new variable's name: not in use, and not a procedure's. *)
@@ -1243,6 +1323,17 @@ Fixpoint case_names (handlers : cases) : list (string * place) :=
   match handlers with
   | No_cases => []
   | Case failure failure_at _ _ rest => (failure, failure_at) :: case_names rest
+  | Included _ _ _ _ _ rest => case_names rest
+  | Expanded _ name_at _ _ _ _ _ inlined rest =>
+      map (fun entry => (fst entry, name_at)) (case_names inlined) ++ case_names rest
+  end.
+
+(* Whether an `otherwise` uses a handler that couldn't be found, so what it covers isn't known (D55). *)
+Fixpoint has_unknown_handler (handlers : cases) : bool :=
+  match handlers with
+  | No_cases => false
+  | Included _ _ _ _ _ _ => true
+  | Case _ _ _ _ rest | Expanded _ _ _ _ _ _ _ _ rest => has_unknown_handler rest
   end.
 
 (* trace: D40. Every failure the call can give has its case, each once, and none for a failure it can't give. *)
@@ -1512,7 +1603,9 @@ Fixpoint check_statement (s : setting) (st : statement) {struct st} : setting * 
                    | [] => [Refused (Without_failing_call "otherwise" otherwise_at)]
                    | _ => []
                    end
-        | _, failures => coverage (attempt_procedure checked) failures handlers otherwise_at
+        | _, failures =>
+            if has_unknown_handler (expand_cases (setting_program s) handlers) then []
+            else coverage (attempt_procedure checked) failures handlers otherwise_at
         end in
       (with_ended (attempt_setting checked) (ended_cases ++ setting_ended s),
        match attempt_tree checked with
@@ -1544,6 +1637,34 @@ with check_cases (s : setting) (must_end : bool) (handlers : cases) {struct hand
       let '(ended_rest, rest_tree, dr) := check_cases s must_end rest in
       let falls := if must_end && negb (always_ends_case_block body) then [Refused (Case_falls_off at_)] else [] in
       (ended_body ++ ended_rest, Typed.Case failure body_tree rest_tree, db ++ falls ++ dr)
+  | Included name name_at _ _ at_ rest =>
+      let '(ended_rest, rest_tree, dr) := check_cases s must_end rest in
+      (ended_rest, rest_tree,
+       (match find_handler (setting_program s) name with
+        | Some _ => Not_designed_yet Handler_including_handler at_
+        | None => Refused (Unknown_handler name name_at)
+        end) :: dr)
+  (* trace: D42, D43, D44 *)
+  | Expanded name name_at jump given at_ parameters pairs inlined rest =>
+      let '(ended_rest, rest_tree, dr) := check_cases s must_end rest in
+      let checked := check_arguments s (map (fun x => Some (parameter_type x)) parameters) given in
+      let wanted := map (fun x => (parameter_type x, label_of pairs (parameter_name x))) parameters in
+      let argument_problems := check_against name wanted checked at_ None in
+      let calling :=
+        if existsb (fun a => calls_something (argument_tree a)) checked
+        then [Not_designed_yet Handler_arguments_calling at_] else [] in
+      let jumps := can_leave_cases false inlined in
+      let marks :=
+        if jumps && negb jump then [Refused (Handler_jump_unmarked name name_at)]
+        else if negb jumps && jump then [Refused (Handler_jump_marked name name_at)]
+        else [] in
+      let inner := with_scope s (rev (map parameter_info parameters) ++ setting_scope s) in
+      let '(ended_inlined, inlined_tree, di) := check_cases inner must_end inlined in
+      let declarations :=
+        map (fun '(x, a) => Typed.Declare (parameter_name x) (parameter_type x) (argument_tree a))
+          (combine parameters checked) in
+      (ended_inlined ++ ended_rest, append_cases (with_parameters declarations inlined_tree) rest_tree,
+       marks ++ argument_problems ++ calling ++ di ++ dr)
   end
 
 (* Checks a block's statements in turn; gives back the names it declared, which end with it (D93). *)
@@ -1605,9 +1726,6 @@ Fixpoint check_label_pairs (procedure : string) (parameters : list parameter) (s
              (pair_label one_pair :: seen_labels) rest
   end.
 
-Definition parameter_info (p : parameter) : variable_info :=
-  {| variable_name := parameter_name p; variable_type := parameter_type p; variable_kind := Parameter_variable;
-     variable_name_at := parameter_at p; variable_keyword_at := parameter_at p |}.
 
 (* A body's `labels` line, if it starts with one (D25), and the statements after it. *)
 Definition labels_and_rest (b : block) : option (list label_pair) * block :=
@@ -1628,7 +1746,7 @@ Definition check_definition (p : program) (d : definition) : Typed.block * list 
                     | Named _ => Some (failures_of d, definition_name_at d)
                     end;
                   setting_going_through := []; setting_case := None |} in
-  let (labels_line, rest) := labels_and_rest (definition_body d) in
+  let (labels_line, rest) := labels_and_rest (expand_block p (definition_body d)) in
   let labels_problems :=
     match labels_line with
     | Some pairs => check_label_pairs procedure (definition_parameters d) [] [] pairs
@@ -1664,7 +1782,7 @@ Definition check_definition (p : program) (d : definition) : Typed.block * list 
      ++ labels_problems ++ body_problems ++ last_line ++ missing_return).
 
 (* trace: D4, D64, D92. Exactly one `proc.main`, and one procedure to a name. *)
-Fixpoint check_names (mains : list place) (names : list (string * place)) (p : program) : list diagnostic :=
+Fixpoint check_names (mains : list place) (names : list (string * place)) (p : list definition) : list diagnostic :=
   match p with
   | [] => match mains with [] => [Refused No_main] | _ => [] end
   | d :: rest =>
@@ -1686,7 +1804,7 @@ Fixpoint check_names (mains : list place) (names : list (string * place)) (p : p
 
 (* Every refusal in a program, and its typed tree. *)
 Definition elaborate (p : program) : list diagnostic * Typed.program :=
-  let checked := map (fun d => (d, check_definition p d)) p in
+  let checked := map (fun d => (d, check_definition p d)) (program_definitions p) in
   let procedures :=
     flat_map
       (fun '(d, (body, _)) =>
@@ -1705,7 +1823,7 @@ Definition elaborate (p : program) : list diagnostic * Typed.program :=
     | Some (_, (body, _)) => body
     | None => Typed.Empty
     end in
-  (check_names [] [] p ++ flat_map (fun '(_, (_, ds)) => ds) checked,
+  (check_names [] [] (program_definitions p) ++ flat_map (fun '(_, (_, ds)) => ds) checked,
    {| Typed.program_procedures := procedures; Typed.program_main := main |}).
 
 (* THE CHECKER: every refusal in a program, and every place Ralph must stop because something isn't decided or

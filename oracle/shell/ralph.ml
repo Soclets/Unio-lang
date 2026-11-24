@@ -354,18 +354,24 @@ let examine (files : (string * string) array) =
             (String.index_opt l.text '\r'))
         lines
     in
-    let definitions, problems, stopped, stop_line = Parser.parse ~file:index lines in
+    let definitions, handlers, problems, stopped, stop_line = Parser.parse ~file:index lines in
     let messages =
       List.map (M.in_file index) (Option.to_list carriage_return @ problems @ Spacing.check lines)
     in
     ( Array.of_list (List.map (fun (l : Lexer.line) -> l.text) lines),
-      definitions,
+      (definitions, handlers),
       messages,
       (stopped, stop_line) )
   in
   let read = Array.mapi read_one files in
   let source = Array.map (fun (lines, _, _, _) -> lines) read in
-  let definitions = List.concat_map (fun (_, d, _, _) -> d) (Array.to_list read) in
+  (* trace: D42, D64. The program is every file's procedures and handlers. *)
+  let definitions =
+    {
+      Core.program_definitions = List.concat_map (fun (_, (d, _), _, _) -> d) (Array.to_list read);
+      program_handlers = List.concat_map (fun (_, (_, h), _, _) -> h) (Array.to_list read);
+    }
+  in
   let any_stopped = Array.exists (fun (_, _, _, (stopped, _)) -> stopped) read in
   let core_problems =
     List.filter_map (Wording.diagnostic source) (Core.check_program definitions)

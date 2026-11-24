@@ -25,6 +25,7 @@ type line = {
   tokens : token list;
   comment : bool;  (** whether it ends in a `//` comment (D74) *)
   doc_comment : int option;  (** the column of a `///` doc comment, if there is one *)
+  hidden : bool;  (** inside a `comment name` block, so ignored, whatever it holds (D74) *)
 }
 
 let is_letter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -49,6 +50,7 @@ let symbols =
     ",";
     ":";
     ";";
+    ".*";
     ".";
     "=";
     "<";
@@ -129,7 +131,35 @@ let lex_line number text =
             scan finish (token (Unknown (String.sub text at (finish - at))) at finish :: tokens)
   in
   let tokens, comment, doc_comment = scan 0 [] in
-  { number; text; tokens; comment; doc_comment }
+  { number; text; tokens; comment; doc_comment; hidden = false }
+
+(* trace: D74. A `comment name` block ignores everything between its opening line and its own `end comment name`,
+   broken code included, so blocks can sit inside each other. The lines between are hidden from everything that reads
+   the program; the opening and closing lines are read as any block's are. A block that never ends hides the rest. *)
+let hide_comment_blocks (lines : line list) =
+  let opens (l : line) =
+    match l.tokens with [ { kind = Word "comment"; _ }; { kind = Word name; _ } ] -> Some name | _ -> None
+  in
+  let closes name (l : line) =
+    match l.tokens with
+    | [ { kind = Word "end"; _ }; { kind = Word "comment"; _ }; { kind = Word n; _ } ] -> n = name
+    | _ -> false
+  in
+  let rec go acc = function
+    | [] -> List.rev acc
+    | l :: rest -> (
+        match opens l with
+        | None -> go (l :: acc) rest
+        | Some name ->
+            let rec hide inside = function
+              | [] -> (List.rev inside, [])
+              | m :: more when closes name m -> (List.rev inside, m :: more)
+              | m :: more -> hide ({ m with tokens = []; comment = true; doc_comment = None; hidden = true } :: inside) more
+            in
+            let hidden, after = hide [] rest in
+            go (List.rev_append hidden (l :: acc)) after)
+  in
+  go [] lines
 
 (* Splits a file into lines; a line break at the very end doesn't start another line. A `\r` right before a line
    break is part of the break (D144). *)
@@ -145,7 +175,7 @@ let lines_of contents =
       pieces
   in
   let pieces = match List.rev pieces with "" :: rest -> List.rev rest | _ -> pieces in
-  List.mapi (fun index text -> lex_line (index + 1) text) pieces
+  hide_comment_blocks (List.mapi (fun index text -> lex_line (index + 1) text) pieces)
 
 let describe kind =
   match kind with

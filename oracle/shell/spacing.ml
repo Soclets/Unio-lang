@@ -27,7 +27,7 @@ let word_operators = [ "and"; "or"; "not"; "at_least"; "at_most"; "div"; "rem"; 
 (* Words after which a `-` negates, as after an operator. *)
 let leads_into_value =
   [
-    "return"; "and"; "or"; "not"; "if"; "while"; "at_least"; "at_most"; "else"; "eq"; "not_eq"; "in";
+    "return"; "and"; "or"; "not"; "if"; "while"; "at_least"; "at_most"; "else"; "eq"; "not_eq"; "in"; "instead";
   ]
 
 let is_operator t =
@@ -87,9 +87,9 @@ let right_gap ?(types = [||]) tokens index =
   else
     let symbol_in list t = match t.kind with Symbol s -> List.mem s list | _ -> false in
     (* trace: D23. `?` touches the call before it. *)
-    if symbol_in [ ";"; ","; ")"; "]"; ":"; "."; "?" ] b then 0
+    if symbol_in [ ";"; ","; ")"; "]"; ":"; "."; ".*"; "?" ] b then 0
     (* trace: D155. `~` touches the number it marks. *)
-    else if symbol_in [ "("; "["; "."; "~" ] a then 0
+    else if symbol_in [ "("; "["; "."; ".*"; "~" ] a then 0
     else if symbol_is "-" a && negates tokens index then 0
     else if symbol_is "(" b then
       match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1
@@ -231,4 +231,4 @@ let check_line (l : Lexer.line) : M.message option =
         in
         Some (M.message M.Refused { M.file = 0; line = l.number; carets } ~fix:fixed ~why)
 
-let check (lines : Lexer.line list) = List.filter_map check_line lines
+let check (lines : Lexer.line list) = List.filter_map check_line (List.filter (fun (l : Lexer.line) -> not l.hidden) lines)

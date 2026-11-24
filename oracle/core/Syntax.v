@@ -137,6 +137,11 @@ Record label_pair := {
   pair_label : string;
   pair_label_at : place }.
 
+Record parameter := {
+  parameter_name : string;
+  parameter_at : place;
+  parameter_type : type }.
+
 Inductive statement :=
 (* `let` or `var` (D13): whether it can change, its name, its type and first value. *)
 | Declare (changeable : bool) (name : string) (name_at keyword_at : place) (written : type)
@@ -165,6 +170,12 @@ Inductive statement :=
 with cases :=
 | No_cases
 | Case (failure : string) (failure_at : place) (body : block) (at_ : place) (rest : cases)
+(* A handler's cases, from `otherwise family.handler` or `include family.handler` (D42, D43): its full name, whether
+   it's marked `.*`, and its arguments (D44). *)
+| Included (name : string) (name_at : place) (jump_marked : bool) (given : arguments) (at_ : place) (rest : cases)
+(* An [Included] handler with its parameters, `labels` and cases written in, as the checker reads it. *)
+| Expanded (name : string) (name_at : place) (jump_marked : bool) (given : arguments) (at_ : place)
+    (parameters : list parameter) (pairs : list label_pair) (inlined : cases) (rest : cases)
 with block :=
 | Empty
 | Then (first : statement) (rest : block)
@@ -176,10 +187,6 @@ with else_part :=
 (* A procedure's name: `proc.main` (D4), or a name of its own. *)
 Inductive procedure_name := Main | Named (name : string).
 
-Record parameter := {
-  parameter_name : string;
-  parameter_at : place;
-  parameter_type : type }.
 
 (* A procedure's definition (D4, D37, D38, D126). *)
 Record definition := {
@@ -192,7 +199,18 @@ Record definition := {
   definition_body : block;
   definition_at : place }.
 
-Definition program := list definition.
+(* A handler in a `fam.handler` (D42, D44): its full name, as `word_failed.use_placeholder`, its parameters, its
+   `labels` line, and its cases. *)
+Record handler := {
+  handler_name : string;
+  handler_name_at : place;
+  handler_parameters : list parameter;
+  handler_labels : list label_pair;
+  handler_cases : cases;
+  handler_at : place }.
+
+(* A whole program: every procedure of every file, and every handler (D64). *)
+Record program := { program_definitions : list definition; program_handlers : list handler }.
 
 (* The induction principles Rocq makes by itself cover one type at a time; these cover the types that refer to each
    other. *)
