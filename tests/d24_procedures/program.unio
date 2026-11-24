@@ -1,5 +1,5 @@
 proc heal[health: Whole, amount: Whole, times: Whole] -> Whole:
-    labels amount as by, times as times;
+    labels [amount as by, times as times];
     return health + amount * times;
 end proc heal
 

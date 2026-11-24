@@ -3,7 +3,7 @@ proc double[n: Whole] -> Whole:
 end proc double
 
 proc add_to[n: Whole, amount: Whole] -> Whole:
-    labels amount as by;
+    labels [amount as by];
     return n + amount;
 end proc add_to
 

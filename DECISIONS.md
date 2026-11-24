@@ -788,6 +788,8 @@ value, so it's a call (D3, D4).
 **Tankun's words.** "Why no `[]`?", "Wait, then `range()` is legal or not", then, asked "A `labels` line, with no
 brackets?", the owner chose: "yea".
 
+(Changed by D195: the `labels` line puts its pairs in `[ ]`.)
+
 ## D26. `random(from: low, to: high)` gives a whole number with both ends included
 
 2026-11-20.
@@ -5968,3 +5970,30 @@ mean, just do shit, and show them in backgrounds", "Holy shit, that `[` color be
 No, they don't. I think it's good now", then, asked "Should the second draft become Unio's colours?", the owner
 chose: "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What about the
 font?"
+
+## D195. The `labels` line puts its pairs in `[ ]`
+
+2026-11-24.
+
+**Chosen.** A `labels` line writes its pairs in `[ ]`, with one space after `labels`, replacing D25's line with no
+brackets:
+
+```
+proc heal[hp: Whole, amount: Whole, max: Whole] -> Whole:
+    labels [amount as by, max as up_to];
+```
+
+A `labels` line without its `[ ]` is refused; its wording comes with a later batch. Everything else in D25 stands: the
+line is the body's first, and callers write the labels as before, as in `heal(hp, by: 30, up_to: 100)`.
+
+**Weighed.**
+- No brackets (D25). Its reason was that `[ ]` meant a list, and these pairs aren't one. D165 then widened `[ ]` to
+  values listed or described, a procedure's parameters included, which aren't a list the program works with either,
+  so the reason no longer holds.
+
+**Why this won.** The pairs describe the procedure's parameters, the same job `[ ]` does in the header just above, so
+the brackets rule (D165) covers them. It also matches Seal's `labels [ ]` (Seal D42).
+
+**Tankun's words.** "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What
+about the font?" (quoted whole in D194), "You sure with the labels?", "Look at the brackets rule", then, asked "Should
+the `labels` line put its pairs in `[ ]`, replacing D25?", the owner chose: "change"

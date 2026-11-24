@@ -133,18 +133,19 @@ let secret: Whole = random(from: 1, to: 100);
   (D24).
 - **By convention, the first argument has no label,** as in `show_msg("Hi")` (D24).
 
-A procedure declares its labels on a `labels` line, the first line of its body, with no brackets (D25):
+A procedure declares its labels on a `labels` line, the first line of its body, with its pairs in `[ ]` (D25, D195):
 
 ```
-labels parameter as label, parameter as label;
+labels [parameter as label, parameter as label];
 ```
 
 where each `parameter` is one of the procedure's parameters and `label` the word callers write for it. `labels`, `as`,
-the commas and the `;` are written as they are.
+the `[ ]`, the commas and the `;` are written as they are, with one space between `labels` and `[`. A `labels` line
+without its `[ ]` is refused (D195).
 
 ```
 proc random[low: Whole, high: Whole] -> Whole:
-    labels low as from, high as to;
+    labels [low as from, high as to];
     ...
 end proc random
 ```

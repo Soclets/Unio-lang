@@ -24,7 +24,7 @@ message".
 | `be` | | D22 |
 | `ignore`, `crash`, `otherwise`, `case` | | D23, D40 |
 | `instead` | | D40 |
-| `labels`, `as` | | D25 |
+| `labels`, `as` | | D25, D195 |
 | `.fmt` | format | D2, D29 |
 | `extern`, `.cpp` | external | D2, D36, D131 |
 | `eq`, `not_eq` | equal, not equal | D190 |
@@ -92,7 +92,7 @@ Each kind of bracket has one meaning (D3, D165):
 | Bracket | Means | Examples |
 |---|---|---|
 | `( )` | calls a procedure; and, as school maths writes it, groups in maths | `add(1, 2)`, `(a + b) * 2` |
-| `[ ]` | values, listed or described: a list, reaching an item, a type's settings, a procedure's parameters, building a record | `[1, 2, 3]`, `bag[pos: 1]`, `List<Text>[max: 10]`, `proc add[a: Whole, b: Whole]` |
+| `[ ]` | values, listed or described: a list, reaching an item, a type's settings, a procedure's parameters and their labels, building a record | `[1, 2, 3]`, `bag[pos: 1]`, `List<Text>[max: 10]`, `proc add[a: Whole, b: Whole]`, `labels [b as to]` |
 | `< >` | a type, filled in | `List<Whole>` |
 
 `( )` marks where a procedure is called, code with a name and a body; built-in operations, like `+`, reaching an item
