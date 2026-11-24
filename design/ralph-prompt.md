@@ -4,10 +4,12 @@
 
 Copy the block below and paste it into the existing "Unio Oracle Claude" session, the one that built Ralph's first
 milestone, on Claude Opus 5.5 at `high` effort. That session knows Ralph's code firsthand; what changed since is in
-`DECISIONS.md`, and its own notes are in `oracle/PROGRESS.md`, `oracle/test-status.json` and `git log`. Written by the design session
-on 2026-11-23, after reading Anthropic's "Prompting Claude Opus 5.5" in full and the general "Prompting best practices"
-it points to, also in full, as IMPLEMENTATION.md's Prompting rule asks. It replaces an unpasted prompt for a second
-milestone that covered only lists, loops and floats.
+`DECISIONS.md`, and its own notes are in `oracle/PROGRESS.md`, `oracle/test-status.json` and `git log`. Written by the
+design session on 2026-11-23, after reading Anthropic's "Prompting Claude Opus 5.5" in full and the general "Prompting
+best practices" it points to, also in full, as IMPLEMENTATION.md's Prompting rule asks. Checked again on 2026-11-24,
+after a compaction, against those two and "Prompting Claude Opus 5", which the Opus 5.5 guide points to: `<keep_going>`
+moved to the end, as the guide places that kind of instruction, and subagent use and `PROGRESS.md`'s length are now
+bounded. It replaces an unpasted prompt for a second milestone that covered only lists, loops and floats.
 
 ````text
 <role>
@@ -112,6 +114,34 @@ theorems' statements in plain words, and stop: what comes next is Tankun's call.
   and carry on with other work.
 </tests>
 
+<working_with_others>
+- Tankun: before you start, say in a line what you're about to do; after each working step, a sentence or two in plain
+  words on what now works; and close each report with a short recap that stands on its own. Ask Tankun one question at
+  a time, in plain chat, with no popups or ready-made answer buttons. Questions about how Unio behaves go to the design
+  session first.
+- The design session is the Claude session titled "Unio & Seal Design Claude"; ask Tankun if you can't find it. Message
+  it as one colleague messages another, plainly, with decision numbers, what you found, and what you need. It asks
+  Tankun before messaging you, and answers a batch of questions together, so replies may take a while; carry on
+  meanwhile.
+- The shared folder: other sessions work here too. Edit only `oracle/` and `check/`, commit only your own files by name,
+  never `git add -A` or `git add .`, and end each commit with `Co-Authored-By: oracle claude <noreply@anthropic.com>`.
+  If a push is refused, `git pull --rebase` and push again.
+- Use 3 CPU cores for builds and tests (Building rule 6). Tankun's Claude usage is limited, so hand work to a subagent
+  only for a large, independent track, such as a wide search, never for work you can finish in a handful of tool calls
+  or to double-check your own work; its prompt carries IMPLEMENTATION.md's rules, since the hook doesn't reach it.
+- Keep `PROGRESS.md` to what's needed to carry on and to answer Tankun: no filler sections or repeated summaries.
+- Build what the decisions ask for, with no extra features or options.
+</working_with_others>
+
+<first_steps>
+1. Run `pwd`, then read the sources above.
+2. Run the one command from `PROGRESS.md` and note which tests the new spellings now fail, before changing anything.
+3. Add a plan to `PROGRESS.md`: checkpoints in small steps that each end with something running, with the order you'll
+   prove things in.
+4. Start with the new spellings (D190, D192, D195, D199 to D201), so every test the first milestone passed passes again.
+5. Then widen the language one checkpoint at a time, proving as you go rather than all at the end.
+</first_steps>
+
 <keep_going>
 A standing instruction from Tankun, the person you are working for, about how your turns end. A message with no tool
 call in it ends your turn, and the work stops there until you are asked to continue. Tankun has seen turns end in four
@@ -133,30 +163,4 @@ Your context will be compacted automatically as it fills, so never stop or rush 
 push after each working step, and keep `oracle/PROGRESS.md` and `oracle/test-status.json` current enough that after a
 compaction you can carry on from them and `git log`.
 </keep_going>
-
-<working_with_others>
-- Tankun: before you start, say in a line what you're about to do; after each working step, a sentence or two in plain
-  words on what now works; and close each report with a short recap that stands on its own. Ask Tankun one question at
-  a time, in plain chat, with no popups or ready-made answer buttons. Questions about how Unio behaves go to the design
-  session first.
-- The design session is the Claude session titled "Unio & Seal Design Claude"; ask Tankun if you can't find it. Message
-  it as one colleague messages another, plainly, with decision numbers, what you found, and what you need. It asks
-  Tankun before messaging you, and answers a batch of questions together, so replies may take a while; carry on
-  meanwhile.
-- The shared folder: other sessions work here too. Edit only `oracle/` and `check/`, commit only your own files by name,
-  never `git add -A` or `git add .`, and end each commit with `Co-Authored-By: oracle claude <noreply@anthropic.com>`.
-  If a push is refused, `git pull --rebase` and push again.
-- Use 3 CPU cores for builds and tests (Building rule 6). If you hand work to a subagent, its prompt carries
-  IMPLEMENTATION.md's rules, since the hook doesn't reach it.
-- Build what the decisions ask for, with no extra features or options.
-</working_with_others>
-
-<first_steps>
-1. Run `pwd`, then read the sources above.
-2. Run the one command from `PROGRESS.md` and note which tests the new spellings now fail, before changing anything.
-3. Add a plan to `PROGRESS.md`: checkpoints in small steps that each end with something running, with the order you'll
-   prove things in.
-4. Start with the new spellings (D190, D192, D195, D199 to D201), so every test the first milestone passed passes again.
-5. Then widen the language one checkpoint at a time, proving as you go rather than all at the end.
-</first_steps>
 ````
