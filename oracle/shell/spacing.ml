@@ -92,7 +92,13 @@ let right_gap ?(types = [||]) tokens index =
     else if symbol_in [ "("; "["; "."; ".*"; "~" ] a then 0
     else if symbol_is "-" a && negates tokens index then 0
     else if symbol_is "(" b then
-      match a.kind with Word w when (not (Parser.is_keyword w)) || w = "be" -> 0 | _ -> 1
+      (* `div.floor (a + b)`: after a division's narrowing, `(` groups maths, with a space (D70, D71). *)
+      let after_division =
+        index >= 2
+        && symbol_is "." tokens.(index - 1)
+        && match tokens.(index - 2).kind with Word ("div" | "rem") -> true | _ -> false
+      in
+      match a.kind with Word w when ((not (Parser.is_keyword w)) || w = "be") && not after_division -> 0 | _ -> 1
       (* trace: D165. No space before the `[` after a name or a type. *)
     else if symbol_is "[" b then
       match a.kind with Word w when not (Parser.is_keyword w) -> 0 | Dollar _ -> 0 | _ -> 1

@@ -1,0 +1,8 @@
+; check/: random Unio programs, written from standard/, run on Ralph and Beta++ as black boxes (Building rule 12).
+; The one command: cd check && opam exec --switch=ralph -- dune exec ./check.exe -- PROGRAMS SEED
+
+(executable
+ (name check)
+ (libraries unix)
+ (flags
+  (:standard -w +a-4-40-41-42-44-45-70 -warn-error +a)))

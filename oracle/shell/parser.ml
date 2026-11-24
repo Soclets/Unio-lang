@@ -1439,7 +1439,8 @@ and parse_if st (t : token) depth =
           begin_line st e depth;
           advance st;
           match peek st with
-          | Some i when is_word "if" i ->
+          (* `else if` is one line; an `if` on the next line is a block inside `else` (D16). *)
+          | Some i when is_word "if" i && i.line = e.line ->
               advance st;
               let condition = parse_condition st in
               expect_opener_end st;
