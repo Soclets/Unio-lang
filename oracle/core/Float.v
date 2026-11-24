@@ -212,6 +212,81 @@ Definition rounding (way : to_whole) (r : R) : Z :=
   | Whole_nearest_even => ZnearestE r
   end.
 
+Lemma fraction_value : forall x : float, is_finite x = true ->
+  0 < snd (fraction x) /\ B2R x = (IZR (fst (fraction x)) / IZR (snd (fraction x)))%R.
+Proof.
+  intros [s | s | | s m e B] F; simpl in F; try discriminate.
+  - simpl. split; [lia |]. unfold Rdiv. rewrite Rmult_0_l. reflexivity.
+  - unfold fraction. destruct (0 <=? e) eqn:E; simpl.
+    + apply Z.leb_le in E. split; [lia |]. unfold F2R; simpl.
+      rewrite Rdiv_1_r, mult_IZR. f_equal. rewrite <- (IZR_Zpower radix2) by exact E. reflexivity.
+    + apply Z.leb_gt in E. split; [apply Z.pow_pos_nonneg; lia |]. unfold F2R; simpl.
+      unfold Rdiv. f_equal. rewrite (IZR_Zpower radix2) by lia. rewrite <- bpow_opp. f_equal. lia.
+Qed.
+
+Lemma compare_half : forall a d, 0 < d ->
+  Rcompare (IZR a / IZR d) (/ 2) = Z.compare (2 * a) d.
+Proof.
+  intros a d D.
+  assert (Dr : (0 < IZR d)%R) by (apply IZR_lt; exact D).
+  rewrite <- (Rcompare_mult_r (2 * IZR d)) by lra.
+  replace (IZR a / IZR d * (2 * IZR d))%R with (IZR (2 * a)) by (rewrite mult_IZR; field; lra).
+  replace (/ 2 * (2 * IZR d))%R with (IZR d) by (field; lra).
+  apply Rcompare_IZR.
+Qed.
+
+Lemma round_fraction_correct : forall way n d, 0 < d -> round_fraction way n d = rounding way (IZR n / IZR d).
+Proof.
+  intros way n d D.
+  assert (Nd : d <> 0) by lia.
+  assert (Fl : Zfloor (IZR n / IZR d) = n / d) by (apply Zfloor_div; exact Nd).
+  assert (Left : n - n / d * d = n mod d) by (rewrite Z.mod_eq by exact Nd; lia).
+  assert (Ceil : Zceil (IZR n / IZR d) = if n mod d =? 0 then n / d else n / d + 1).
+  { unfold Zceil. replace (- (IZR n / IZR d))%R with (IZR (- n) / IZR d)%R by (rewrite opp_IZR; field; apply eq_IZR_contrapositive; exact Nd).
+    rewrite Zfloor_div by exact Nd. destruct (Z.eqb_spec (n mod d) 0) as [Z0 | Z0].
+    - rewrite Z.div_opp_l_z by assumption. lia.
+    - rewrite Z.div_opp_l_nz by assumption. lia. }
+  destruct way; unfold round_fraction, rounding; cbv zeta.
+  - symmetry; exact Fl.
+  - symmetry; apply Ztrunc_div; exact Nd.
+  - rewrite Ceil, Left. reflexivity.
+  - unfold Znearest. rewrite Fl.
+    replace (IZR n / IZR d - IZR (n / d))%R with (IZR (n mod d) / IZR d)%R
+      by (rewrite <- Left, minus_IZR, mult_IZR; field; apply eq_IZR_contrapositive; exact Nd).
+    rewrite compare_half by exact D. rewrite Left, Ceil.
+    pose proof (Z.mod_pos_bound n d D) as Bd.
+    destruct (Z.compare_spec (2 * (n mod d)) d) as [C | C | C].
+    + destruct (Z.eqb_spec (n mod d) 0); [lia |]. destruct (Zle_bool_spec 0 (n / d)) as [P | P].
+      * destruct (Z.leb_spec 0 (n / d)); [reflexivity | lia].
+      * destruct (Z.leb_spec 0 (n / d)); [lia | reflexivity].
+    + reflexivity.
+    + destruct (Z.eqb_spec (n mod d) 0); [lia | reflexivity].
+  - unfold Znearest. rewrite Fl.
+    replace (IZR n / IZR d - IZR (n / d))%R with (IZR (n mod d) / IZR d)%R
+      by (rewrite <- Left, minus_IZR, mult_IZR; field; apply eq_IZR_contrapositive; exact Nd).
+    rewrite compare_half by exact D. rewrite Left, Ceil.
+    pose proof (Z.mod_pos_bound n d D) as Bd.
+    destruct (Z.compare_spec (2 * (n mod d)) d) as [C | C | C].
+    + destruct (Z.eqb_spec (n mod d) 0); [lia |]. destruct (Z.even (n / d)); reflexivity.
+    + reflexivity.
+    + destruct (Z.eqb_spec (n mod d) 0); [lia | reflexivity].
+Qed.
+
+(* THEOREM: `be.Whole` on a `Float` gives exactly the whole number D178 describes.
+   In plain words: for any `Float`, `be.Whole.floor`, `.trunc`, `.ceil`, `.nearest` and `.nearest.even` give exactly the
+   whole number its real value rounds to that way: down, toward zero, up, to the nearest with a tie going away from
+   zero, and to the nearest with a tie going to the even one, as Flocq defines [Zfloor], [Ztrunc], [Zceil], [ZnearestA]
+   and [ZnearestE]; when that whole number is too big or too small for a `Whole`, they stop with the check instead. *)
+Theorem float_to_whole_exact : forall way (x : float), is_finite x = true ->
+  float_to_whole way x =
+    let n := rounding way (B2R x) in
+    if ((whole_minimum <=? n) && (n <=? whole_maximum))%bool then Some n else None.
+Proof.
+  intros way x F. destruct (fraction_value x F) as [D V].
+  unfold float_to_whole. destruct (fraction x) as [n d] eqn:Fr. simpl in D, V. cbv zeta.
+  rewrite V, round_fraction_correct by exact D. reflexivity.
+Qed.
+
 (* trace: D162. A whole number as the nearest `Float`; every `Whole` fits, so it never stops. *)
 Definition float_of_whole (n : Z) : float := binary_normalize 53 1024 _ _ mode_NE n 0 false.
 
@@ -313,6 +388,16 @@ Fixpoint shortest_steps (steps : nat) (count : Z) (x : float) (n d t : Z) : Z * 
       end
   end.
 
+(* Drops a decimal's zeros at its end, as [(digits, k)] meaning [digits / 10^k]: a rounding that carried, as 9.99
+   to 10.0, gives one more digit than it needs. *)
+Fixpoint without_end_zeros (steps : nat) (shown k : Z) : Z * Z :=
+  match steps with
+  | O => (shown, k)
+  | S steps' =>
+      if (0 <? k)%Z && (shown mod 10 =? 0)%Z && negb (shown =? 0)%Z then without_end_zeros steps' (shown / 10) (k - 1)
+      else (shown, k)
+  end.
+
 (* trace: D155, D181, D182, D183. A `Float` as text: the shortest decimal that reads back as it, written out in full,
    with `.0` when it has no fraction, and `~` in front when it isn't exactly the stored value. Negative zero shows as
    `0.0`. [None] for a negative value shown with `~`: where the `~` goes on a negative number isn't decided. *)
@@ -321,7 +406,7 @@ Definition text_of_float (x : float) : option string :=
   if (n =? 0)%Z then Some "0.0"
   else
     let a := Z.abs n in
-    let '(shown, k) := shortest_steps 30 1 x a d (ten_power a d) in
+    let '(shown, k) := let '(s, k) := shortest_steps 30 1 x a d (ten_power a d) in without_end_zeros 30 s k in
     let body := decimal_text shown k in
     let body := if (k <=? 0)%Z then body ++ ".0" else body in
     let exact := if (0 <=? k)%Z then Z.eqb (shown * d) (a * 10 ^ k) else Z.eqb (shown * 10 ^ (- k) * d) a in

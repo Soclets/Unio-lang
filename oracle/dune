@@ -10,3 +10,13 @@
    %{dep:shell/ralph.exe}
    %{dep:assumptions/assumptions.txt}
    %{dep:assumptions/axioms.txt})))
+
+; Reading and showing `Float`s aren't proven yet, so they're tested against Python on thousands of numbers.
+
+(rule
+ (alias check)
+ (deps tests/floats_check.py)
+ (action
+  (progn
+   (with-stdout-to floats.txt (run %{exe:tests/floats.exe}))
+   (run python3 -I %{dep:tests/floats_check.py} floats.txt))))

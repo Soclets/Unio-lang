@@ -1,5 +1,5 @@
-(executable
- (name run_tests)
- (libraries unix)
+(executables
+ (names run_tests floats)
+ (libraries unix ralph_core)
  (flags
   (:standard -w +a-4-40-41-42-44-45-70 -warn-error +a)))

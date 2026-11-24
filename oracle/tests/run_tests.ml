@@ -234,7 +234,7 @@ let () =
                   List.iter (fun problem -> Printf.printf "    %s\n" problem) problems)
             results;
           (match assumptions_verdict with
-          | Pass -> print_endline "pass  Print Assumptions: every main theorem rests on nothing"
+          | Pass -> print_endline "pass  Print Assumptions: every main theorem rests on nothing beyond assumptions/axioms.txt"
           | Fail problems ->
               print_endline "FAIL  Print Assumptions";
               List.iter (fun problem -> Printf.printf "    %s\n" problem) problems);
