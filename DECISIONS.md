@@ -6214,3 +6214,26 @@ so the extra line would come up often.
 
 **Tankun's words.** "?", meaning "What?", to the first wording of the question, then, asked "Should braces fill in a `Bool` by itself, as `true` or `false`?", the
 owner chose: "yea"
+
+## D203. Variables keep their written type: no type inference, as D13 has it
+
+2026-11-24.
+
+**Chosen.** D13 stands: every `let` and `var` writes its type, with no type worked out from the value.
+
+```
+let name: Text = "Tankun";
+let names: List<Text> = ["M", "M"];
+```
+
+**Weighed.**
+- A `let` or `var` taking its type from its value, writing it only where the value can't show the whole type, after
+  Keel, a sketch from Mult. Shorter lines, but a plain `[ … ]` can be a `List` or an `Array` and can carry a limit,
+  so an `Array`, a list with a limit and an empty `[]` would still write theirs: a list of exceptions to learn.
+- Inference with the type optional everywhere. Every line gets two spellings.
+
+**Why this won.** One rule with no exceptions, types on the page where a learner sees them, and Mult's reason from D13
+still holds: nothing looks typeless and then surprises a learner later.
+
+**Tankun's words.** "yea" (to taking the question up), "`["M", "M"]` is infer?", "Or just no ty infe?", then, asked
+"Should Unio keep D13, with every `let` and `var` writing its type?", the owner chose: "Y"

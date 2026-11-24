@@ -29,7 +29,7 @@ refusal lives, the readings taken where the standard was quiet, and the answered
 treat anything you remember from that milestone as older than `DECISIONS.md`, which wins wherever they differ.
 
 That subset is a small part of Unio. Since then the design session and Tankun have decided a great deal more, up to
-D202: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
+D203: among it lists, arrays, `range` and `for each` (D165 to D174), floats (D155 to D185), failures in full (D39, D40,
 D42 to D44, D186), families (D41), comments and spacing (D74, D97, D98), several files in one program (D64, D188),
 `Bool` conditions (D187), and new spellings (D190: `eq` and `not_eq` for `==` and `!=`, `-> Type` for `returns`, and
 `! [ … ]` for `fails`; D192: names have no `$`; D195: `labels [ … ]`; D199: no `:` on opening lines; D200: every text
@@ -64,7 +64,7 @@ more than being fast. Never read `compiler/`: if Ralph copied the compiler, thei
 
 <finish_line>
 Build all of Unio as decided, except what only the compiler can do. Done when all of these hold:
-1. **Every decision is built,** from D1 to D202, except `extern.cpp` (C++ bodies, the compiler's), build modes and
+1. **Every decision is built,** from D1 to D203, except `extern.cpp` (C++ bodies, the compiler's), build modes and
    anything about speed, which Ralph doesn't have (D46, Building rule 1), and everything the standard marks Not
    decided, which stops with `NotDesignedYet`.
 2. **Every test in `tests/` passes,** standard output, standard error and exit status byte for byte, as
