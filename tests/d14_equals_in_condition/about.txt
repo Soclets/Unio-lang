@@ -1,1 +1,1 @@
-A lone = in a condition is refused, with == as the fix. D14, D54, D84, D85, D86, D192; standard ch. 5, 6 and 11.
+A lone = in a condition is refused, with eq as the fix. D14, D54, D84, D85, D86, D190, D192; standard ch. 5, 6 and 11.
