@@ -5922,3 +5922,49 @@ Unio's editor theme. Other editors may colour differently, and the docs say so o
 **Tankun's words.** "That's pretty weird, then how are we gonna teach colors?", then, asked "Should Unio have its own
 fixed colours, the same in the docs, the `unio` command and its editor theme?", the owner chose: "yea. But even fucking
 ISO doesn't have a standard for this shit?"
+
+## D194. Unio's colours: Solarized's, made readable on common backgrounds, with red only for errors
+
+2026-11-24.
+
+**Chosen.** D193's fixed colours are:
+
+| Kind | Looks | Dark version | Light version |
+|---|---|---|---|
+| keywords, as in `if`, `let`, `eq` | green, bold | `#859900` | `#687700` |
+| variables and parameters | blue | `#3a95d6` | `#2073ae` |
+| procedures and narrowings, as in `heal`, `show_msg.fmt` | yellow | `#b58900` | `#8b6900` |
+| methods, as in `bag.len` | orange | `#d7744c` | `#c14715` |
+| types, as in `Whole`, `List<Text>` | pink | `#de66a0` | `#c8337c` |
+| labels, as in `by:` | violet, italic | `#8589ce` | `#6368b4` |
+| text and numbers | cyan | `#2aa198` | `#207c75` |
+| comments | grey, italic | `#8f8f8f` | `#6e6e6e` |
+| brackets, punctuation and operators | grey | `#8f8f8f` | `#6e6e6e` |
+| errors only: `refused:`, `check failed:`, `failed:` and the `^` under the cause | red | `#e56765` | `#d3302d` |
+
+- **Each colour starts from Solarized's,** brightened for the dark version or darkened for the light one only as far as
+  it takes to reach a contrast ratio of 4.5 (the web's accessibility line for easy-to-read text) on every common
+  background of its kind: black, Solarized dark (`#002b36`) and VS Code's dark (`#1f1f1f`); white, which is also VS
+  Code's light, and Solarized light (`#fdf6e3`).
+- **Red means an error** and nothing else.
+- **Brackets and punctuation are a plain grey,** with no blue in it, so they fade behind the names.
+
+How the command tells a dark background from a light one isn't decided yet.
+
+**Weighed.**
+- A first draft with procedures violet and punctuation Solarized's blue-grey. Tankun: the `[` next to `heal` looked
+  too alike, so procedures became yellow, types pink and labels violet, with punctuation a plain grey.
+- Solarized's colours as they are. Several fall well short of 4.5 on Solarized light, cyan at 2.9 among them.
+- Higher contrast throughout. Solarized's softer contrast is what's comfortable for Tankun's eyes, so each colour moves
+  only as far as it must.
+
+**Why this won.** Solarized is the theme Tankun reads code in, every kind gets its own colour on all five backgrounds,
+and keeping red for errors means an error always looks like one.
+
+**Tankun's words.** "What do these numbers even mean, bro? Are we fucking benchmarking color now?", "Idk what those
+mean, just do shit, and show them in backgrounds", "Holy shit, that `[` color being close to `heal` is not helping",
+"Better, but types and labels look too alike
+
+No, they don't. I think it's good now", then, asked "Should the second draft become Unio's colours?", the owner
+chose: "yea. Btw, you forgot `[]` on labels. And I also think we should remove `:` block starters. What about the
+font?"

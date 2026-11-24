@@ -58,7 +58,27 @@ sees the colours the docs teach (D193):
 - **The command colours only what goes to a terminal,** never output going to a file or another program, and nothing
   when `NO_COLOR` is set.
 
-**Not decided:** the colours themselves.
+The colours are (D194):
+
+| Kind | Looks | Dark version | Light version |
+|---|---|---|---|
+| keywords, as in `if`, `let`, `eq` | green, bold | `#859900` | `#687700` |
+| variables and parameters | blue | `#3a95d6` | `#2073ae` |
+| procedures and narrowings, as in `heal`, `show_msg.fmt` | yellow | `#b58900` | `#8b6900` |
+| methods, as in `bag.len` | orange | `#d7744c` | `#c14715` |
+| types, as in `Whole`, `List<Text>` | pink | `#de66a0` | `#c8337c` |
+| labels, as in `by:` | violet, italic | `#8589ce` | `#6368b4` |
+| text and numbers | cyan | `#2aa198` | `#207c75` |
+| comments | grey, italic | `#8f8f8f` | `#6e6e6e` |
+| brackets, punctuation and operators | grey | `#8f8f8f` | `#6e6e6e` |
+| errors only: `refused:`, `check failed:`, `failed:` and the `^` under the cause | red | `#e56765` | `#d3302d` |
+
+The dark version is for dark backgrounds and the light version for light ones. Each colour is Solarized's, brightened
+or darkened only as far as it takes to reach a contrast ratio of 4.5 (the web's accessibility line for easy-to-read
+text) on black, Solarized dark (`#002b36`) and VS Code's dark (`#1f1f1f`), or on white and Solarized light (`#fdf6e3`).
+Red is used for nothing but errors.
+
+**Not decided:** how the command tells a dark background from a light one.
 
 A name is lowercase English letters `a` to `z`, digits, and `_` between words, starting with
 a letter: `player2`, `hp_max_2`, `roll_dice`. No capitals, and `_` never at the start or end, nor two in a row (D99).
