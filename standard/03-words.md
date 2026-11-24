@@ -129,7 +129,6 @@ own (D60).
 | `+`, `-` | add and subtract, with a space on each side; a `-` with no space after it negates | D27 |
 | `*` | multiplies, with a space on each side | D59 |
 | `/` | divides exactly, with a space on each side | D70 |
-| `&` | joins text | D28 |
 | `?` | passes a failure up | D23 |
 | `??` | handles a failure on one line | D23 |
 | `.*` | marks a handler that can jump, where it's used; one symbol, stuck to the dot | D42, D59 |

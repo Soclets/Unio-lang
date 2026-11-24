@@ -67,8 +67,7 @@ Without brackets, operators go in school maths' order (D72):
 4. comparisons, then `not`, `and` and `or`;
 5. `|>`, last, so a slide takes everything on its left (D73).
 
-So `2 + 3 * 4` is 14. Where maths doesn't say, brackets are required: `&` next to an unbracketed `+`, `-`, `*`, `/`,
-`div` or `rem` is refused (D72).
+So `2 + 3 * 4` is 14.
 
 Dividing by zero is a failed check that stops the program (D46, D72).
 
@@ -104,11 +103,12 @@ show_msg("Don't give up!");
 
 Single quotes aren't used for text (D21).
 
-`&` joins two pieces of text. A number joined with `&` is refused, with `be.Text(...)` as the fix, so it's always
-visible where a number becomes text (D22, D28):
+Text is joined only by filling it in, with braces (below): `"{first} {last}"`. Unio has no operator for joining text,
+and `+` on text is refused, with the braces form as the fix (D28, D201):
 
 ```
-show_msg("You got it in " & be.Text(tries) & " tries.");
+show_msg("Hi " + name);          // refused
+show_msg("Hi {name}");           // the fix
 ```
 
 ### Filling in text

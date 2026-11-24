@@ -1,6 +1,0 @@
-proc.main
-    let name: Text = "Mia";
-    let score: Whole = 120;
-    show_msg("Hello, " & name & "!");
-    show_msg("Score: " & be.Text(score));
-end proc.main

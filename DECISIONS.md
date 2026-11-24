@@ -869,6 +869,8 @@ is Plainly v1's D1 and D6, and multifinity's notes.
 
 **Tankun's words.** Asked "`&` joins text, with no automatic converting?", the owner chose: "yea".
 
+(Changed by D201: `&` goes, and text is joined only with braces.)
+
 ## D29. `.fmt` fills values into text, with braces holding only names
 
 2026-11-20.
@@ -2310,6 +2312,8 @@ rule nobody remembers. This is Plainly v1's D83.
 
 **Tankun's words.** Asked "Maths order like that, with brackets required wherever maths doesn't say?", the owner
 chose: "yea".
+
+(Changed by D201: `&` goes, and with it the rule for `&` next to maths.)
 
 ## D73. `|>` comes last, so a slide takes everything on its left
 
@@ -6157,3 +6161,34 @@ must be a variable, and the fix is a `\`.
 **Tankun's words.** "Should we make Unio have only format text? Even in like vars? And an non-default way to be
 literal", then, asked "Should every text fill `{name}` by itself, with `\{` for a literal brace, replacing `.fmt`?",
 the owner chose: "yea"
+
+## D201. Text is joined only with braces; `&` goes
+
+2026-11-24.
+
+**Chosen.** Unio has no operator for joining text, replacing D28's `&`. Text is joined by filling it in (D200):
+
+```
+show_msg("{first} {last}");
+line = "{line}*";
+let total: Whole = sum(scores);
+show_msg("Total: {total}");
+```
+
+What follows from it:
+- **A call's result is named before it's shown,** as `total` above, since braces hold only names (D29).
+- **`+` on text is still refused** (D28), with the braces form as its fix. D87's wording keeps its shape with a new
+  `why:`: "`+` is only for numbers; text is joined by filling it in with braces."
+- **`&` in a program is refused;** its wording comes with a later batch. D72's rule and D89's message for `&` next to
+  maths go, and so does D28's test.
+
+**Weighed.**
+- Keeping `&` for joining texts already in hand, as in `first & " " & last`, and call results, as in
+  `"Total: " & be.Text(sum(scores))`. Two ways to build the same text, and learners meet both.
+
+**Why this won.** `"{first} {last}"` looks like what it shows, spaces and all, and with braces working everywhere
+(D200), `&` would be a second spelling for the same job, where Unio keeps one (D2, D128). Naming a call's result first
+gives every shown value a name.
+
+**Tankun's words.** has code, "Why?", then, asked "Should `&` go, so text is joined only with braces?", the owner
+chose: "yea"

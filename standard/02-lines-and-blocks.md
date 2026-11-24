@@ -51,7 +51,7 @@ Spacing is fixed, and anything else is refused with the corrected line as the fi
 
 | Where | Rule | Right |
 |---|---|---|
-| around `=`, `<`, `>`, `+`, `-`, `*`, `/`, `&`, `\|>`, `??`, `->`, `!` and word operators like `eq` | one space each side | `a eq b` |
+| around `=`, `<`, `>`, `+`, `-`, `*`, `/`, `\|>`, `??`, `->`, `!` and word operators like `eq` | one space each side | `a eq b` |
 | a narrowing's `.` | none | `show_msg.same_line` |
 | a negating `-` | none after it | `-speed` |
 | after `,` and `:` | one space | `add(1, 2)` |

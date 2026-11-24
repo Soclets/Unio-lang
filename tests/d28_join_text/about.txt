@@ -1,1 +1,0 @@
-Text in double quotes, & joining text, and be.Text turning a number into text. D21, D22, D28, D192; standard ch. 7.
