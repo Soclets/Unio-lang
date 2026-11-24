@@ -49,7 +49,8 @@ a program's shape, names, unreadable code, overflow and the tools' own messages,
 messages, words with no more narrowings, and `NotBuiltYet` and `NotDesignedYet`, D132 for five brought up to date, D142
 for negation's overflow, bad names and D128's slides, D161 for lines outside procedures, unknown types, `not`, `and` and
 `or`, value-only lines, other files, `unio oracle` and usage, D204 for the refusals D187 to D201 brought and four
-brought up to date, D205 for failures, dividing, lists, `for each` and `range`, and D119 for `extern.rust`'s refusals and its macro's
+brought up to date, D205 for failures, dividing, lists, `for each` and `range`, D206
+for floats, and D119 for `extern.rust`'s refusals and its macro's
 messages, since replaced by D131. Where a `what:` sets what's expected against what was found, it says "but" (D89).
 
 The text after every label starts at the same column, one space after the longest label, `because:`, in every message

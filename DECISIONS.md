@@ -6300,3 +6300,32 @@ refusal, and the `for each` one says what D173 itself says to do instead.
 **Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
 one. If you aren't sure, bring it to me." (quoted in D132), and "Bro, aren't you fucking review them yourself? And give
 them to me when you're unsure?" (quoted in D204).
+
+## D206. The wording of the twelfth batch: floats
+
+2026-11-24.
+
+**Chosen.** Drafted by the oracle session and reviewed by the design session, as Tankun asked for wordings (D132):
+
+| Refusal or check | `what:` or `fix:` | `why:` |
+|---|---|---|
+| an inexact literal without `~` (D155) | `fix:` the line with the `~` added | `` `0.1` can't be stored exactly in a `Float`, so it's written `~0.1`, to show it's approximate. `` |
+| a number without a point where a `Float` goes, or with one where a `Whole` goes (D180), as in `speed * 2` or `sqrt(9)` | `fix:` the line with the point added or taken away | `` a number written with a point is a `Float`, and one without is a `Whole`. `` |
+| a `Whole` and a `Float` in one calculation (D162) | `fix:` the `Whole` wrapped in `be.Float(...)` | `` a `Whole` and a `Float` don't mix in one calculation; `be.Float` makes the `Whole` a `Float`. `` |
+| a bare `be.Whole` on a `Float` (D178) | `` `be.Whole` on a `Float` says how the fraction goes: `.floor`, `.trunc`, `.ceil`, `.nearest` or `.nearest.even` `` | `` each gives a different whole number for a `Float` with a fraction, so the program says which. `` |
+| `eq` or `not_eq` between `Float`s in a `while` condition (D184) | `` this `while` condition compares two `Float`s with `not_eq` ``, with no `fix:`, since which comparison fits depends on which way the value moves | `` a `Float` that changes each pass rarely lands exactly on a value, so the loop could pass it and never stop; `<`, `>`, `at_least` or `at_most` say "until it reaches". `` |
+| a `Float` as a condition (D187) | `fix:` the line with `not_eq 0.0` after the condition | D204's |
+| a `Float` result too big (D177) | `` the result is too big for a `Float` ``, `when:` as in `x * y` with the values | `` a `Float` is always a real number, and this one is past the largest a `Float` holds. `` |
+| a `Float` divided by zero (D46) | `` a `Float` can't be divided by zero `` | D205's |
+| `sqrt` of a negative number (D185) | a negative number has no square root, `when:` as in `sqrt(-4.0)` | a `Float` is always a real number, and no real number squared is negative. |
+| `be.Whole` of a `Float` too big for a `Whole` (D178) | `` the result is too big for a `Whole` ``, `when:` as in `be.Whole.floor(x)` with the value | D92's |
+
+**Weighed.** Nothing else was weighed: each follows D54's layout and the wording already decided for the nearest
+refusal. Whether `~` on an exactly stored number, as in `~0.5`, is refused at all is a design question, not a wording,
+and goes to Tankun.
+
+**Why this won.** Each says what's wrong and names the rule, as every decided message does.
+
+**Tankun's words.** "Anyways, you'll be reviewing the err msgs for now, by yourself. Find real problems, not invent
+one. If you aren't sure, bring it to me." (quoted in D132), and "Bro, aren't you fucking review them yourself? And give
+them to me when you're unsure?" (quoted in D204).
