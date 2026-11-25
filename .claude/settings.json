@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"$CLAUDE_PROJECT_DIR/IMPLEMENTATION.md\""
+            "command": "echo \"If the rules below are cut off, read $CLAUDE_PROJECT_DIR/IMPLEMENTATION.md in full with the Read tool before doing anything else.\"; cat \"$CLAUDE_PROJECT_DIR/IMPLEMENTATION.md\""
           }
         ]
       }
