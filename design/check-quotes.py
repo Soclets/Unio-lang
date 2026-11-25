@@ -7,10 +7,12 @@ Line breaks and runs of spaces count as one space, since DECISIONS.md wraps its 
 marker may stand only for a message with a code block or over 300 characters, among Tankun's messages since the
 previous decision's answer.
 
-    python3 -I design/check-quotes.py TRANSCRIPT.jsonl [DECISION_NUMBER] [--log OTHER/DECISIONS.md]
+    python3 -I design/check-quotes.py TRANSCRIPT.jsonl [DECISION_NUMBER] [--log OTHER/DECISIONS.md] [--subject SUBJECT]
 
-With no number, it checks the newest decision. `--log` checks another project's decision log, such as Seal's. It
-exits with status 0 when every quote matches, 1 otherwise.
+With no number, it checks the newest decision. `--log` checks another project's decision log, such as Seal's.
+`--subject` also checks the decision's commit subject: its `(owner: …)` part must quote the answer whole, or, when the
+answer has any backtick or runs over 60 characters, write `has code` or `too long` instead, as IMPLEMENTATION.md says.
+It exits with status 0 when everything matches, 1 otherwise.
 """
 
 import json
@@ -83,6 +85,13 @@ def main():
             sys.exit(__doc__)
         log = Path(args[at + 1])
         del args[at : at + 2]
+    subject = None
+    if "--subject" in args:
+        at = args.index("--subject")
+        if at + 1 >= len(args):
+            sys.exit(__doc__)
+        subject = args[at + 1]
+        del args[at : at + 2]
     if len(args) not in (1, 2):
         sys.exit(__doc__)
     owner, design, raw, events = read_transcript(args[0])
@@ -129,12 +138,30 @@ def main():
                 "decision have a code block or run over 300 characters: quote the others whole"
             )
 
+    subject_problems = []
+    if subject is not None:
+        found = re.search(r'\(owner: (?:"(.*)"|(has code|too long)); D\d+', subject)
+        end = answer_at(words, events)
+        if not found:
+            subject_problems.append("the subject has no (owner: …; D…) part")
+        elif end is None:
+            subject_problems.append("the entry asks no question, so the subject's answer can't be checked")
+        else:
+            answer = events[end][1]
+            wanted = "has code" if "`" in answer else "too long" if len(answer) > 60 else None
+            if wanted and found.group(2) != wanted:
+                subject_problems.append(f"the subject should write {wanted} for the answer, not quote it")
+            if not wanted and found.group(1) != answer:
+                subject_problems.append(f'the subject should quote the answer whole: "{answer}"')
+
     print(title)
-    if problems:
-        for quote in problems:
-            print(f'  not a whole message of Tankun\'s, nor the design session\'s words: "{quote}"')
+    for quote in problems:
+        print(f'  not a whole message of Tankun\'s, nor the design session\'s words: "{quote}"')
+    for problem in subject_problems:
+        print(f"  commit subject: {problem}")
+    if problems or subject_problems:
         sys.exit(1)
-    print("  every quote matches")
+    print("  every quote matches" + (", and the commit subject too" if subject is not None else ""))
 
 
 if __name__ == "__main__":
