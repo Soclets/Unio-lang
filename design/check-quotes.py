@@ -66,7 +66,7 @@ def words_of(decisions, number):
 def answer_at(words, events):
     """Where in the conversation the owner answered this entry's question: the first of Tankun's messages after the
     design session last asked it. None when the entry asks nothing."""
-    asked = re.findall(r'asked "(.*?)", the owner chose', words)
+    asked = re.findall(r'asked "(.*?)", the owner chose', words, re.IGNORECASE)
     if not asked:
         return None
     question = asked[-1]
