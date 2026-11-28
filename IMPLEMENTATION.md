@@ -224,7 +224,9 @@ block, checked against the guide before they're handed over, including how a lon
 it stops. Tankun pastes each prompt into its session; a session never sends one, since a message from another session
 doesn't carry Tankun's say-so (owner, 2026-11-24). A prompt that's already been pasted is never the fix: changes go to
 that session as a message. A subagent's prompt includes this file's rules, since the hook doesn't reach a subagent.
-Messaging another session isn't prompting, and is written like one colleague talking to another.
+Messaging another session isn't prompting, and is written like one colleague talking to another. The app turns a plain
+`@` into a full-width `＠` in messages relayed between sessions, so read `＠` there as `@`, and don't flag it (owner,
+2026-11-27).
 
 ## Git
 
